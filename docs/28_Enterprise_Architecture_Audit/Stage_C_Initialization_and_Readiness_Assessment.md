@@ -24,6 +24,8 @@ Stage C answers a different question than the audit did. The audit asked *"what 
 | `src/` changes across entire branch vs `develop` | **0** — production source untouched ✅ |
 | **Push status** | ⚠️ **18 local commits unpushed.** `origin/architecture-audit` exists but is 18 commits behind local; most of Stage A/B is **local-only**. |
 
+> **BEFORE the 2026-07-08 boundary decision (see `Phase_2_Context_Reset_Handoff.md §15`):** The `Remote` row above reflected the state on 2026-06-20 — `origin` pointed at `github.com/noyanxtdoor-maker/pick-ur-veggie-farm` (repo A). As of 2026-07-08, repo A is **DISREGARDED** and `origin` has been repointed to `github.com/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version` (repo B, canonical). This table is preserved as a historical snapshot; do not read the `Remote` row as a current-state claim. The current remote binding is `origin` → repo B.
+
 **Integrity conclusion:** No production branch modified. No uncommitted work. Repository is safe to continue. **One data-safety risk:** the bulk of the enterprise foundation work exists only on this machine. Given the project's "if I lose data, I'm dead" principle, **pushing `architecture-audit` to GitHub is strongly recommended** before Stage C (owner action — not performed automatically).
 
 ## 2. Architecture package verification

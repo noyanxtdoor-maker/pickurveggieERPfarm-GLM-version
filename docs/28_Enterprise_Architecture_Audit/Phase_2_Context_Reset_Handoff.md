@@ -650,7 +650,7 @@ modified, no guard added, no `supabase` command issued.
 
 ---
 
-### 16. Session 2026-07-08 (Local Docker container rename — Option 1+2 boundary hardening) — owner-approved (tip of this §16 record: pending; will be folded to actual SHA in post-commit-and-push fold)
+### 16. Session 2026-07-08 (Local Docker container rename — Option 1+2 boundary hardening) — owner-approved (tip of this §16 record: `841de03` — the post-commit-and-push fold was deferred from the original session; GLM 5.2 audit folded the `pending` placeholder to the actual SHA)
 
 **Owner decision (verbatim):** "yes do option 1+2" (in response to the Option 1+2 recommendation: don't checkout repo A; rename repo B's local project_id so any future cross-checkout debugging is visible).
 
@@ -705,7 +705,7 @@ modified, no guard added, no `supabase` command issued.
 
 ---
 
-### 17. Session 2026-07-08 (Track A env-recheck — the "git-only terminal" claim was wrong) — doc-side correction only (tip of this §17 record: pending; will be folded to actual SHA in post-commit-and-push fold)
+### 17. Session 2026-07-08 (Track A env-recheck — the "git-only terminal" claim was wrong) — doc-side correction only (tip of this §17 record: `b3e5f5e` — the post-commit-and-push fold was deferred from the original session; GLM 5.2 audit folded the `pending` placeholder to the actual SHA)
 
 **Defect found:** handoff §13 (written in commit `3dd43bf` during the Track A record turn) and STATUS.md §4 line 189-191 both stated "this terminal is git-only" and "QUEUED for the next session that has Docker Desktop + the supabase CLI + the cloud project credentials." This was incorrect.
 
@@ -757,7 +757,7 @@ The role framing from §15 ("YOU ARE JUST AN ASSISTANT TO GLM5.2 WHILE WAITING F
 
 ---
 
-### 18. Session 2026-07-08 ("proceed track b-e" message received — assistant response per the §15 role framing) (tip of this §18 record: pending; will be folded to actual SHA in post-commit-and-push fold)
+### 18. Session 2026-07-08 ("proceed track b-e" message received — assistant response per the §15 role framing) (tip of this §18 record: `f4fa502` — the post-commit-and-push fold was deferred from minimax-m3's original session; GLM 5.2 audit folded the `pending` placeholder to the actual SHA)
 
 **Owner message (verbatim):** "proceed track b-e" (re-prompted multiple times by the system; same message, same goal).
 
@@ -817,3 +817,43 @@ If the owner wants to authorize the build halves to start in this terminal (or i
   - This §18 record is the END-of-session update for this turn. Push to the canonical home (repo B) only. The §15 sticky-header convention is in effect.
 
 **Session-end posture:** clean tree (this §18 record + the matching STATUS.md §4 entry will be committed in one commit). The new tip will be the commit made for this §18 record.
+
+---
+
+### 19. Session 2026-07-08 (GLM 5.2 audit of minimax-m3's work — pending placeholders folded, stale repo-A URL caught) (tip of this §19 record: `pending`; will be folded to actual SHA in post-commit-and-push fold — per the established convention)
+
+**Model switch:** The session switched from minimax-m3 (via ollama-launch) to GLM 5.2 (via Nvidia). The user asked: "continue whats wha left of, finish all unfinish, audit minimaxm3 work and continue." GLM 5.2 resumed the audit role defined in §15.
+
+**Scope of this audit:** All 10 commits minimax-m3 produced between `d256b80` (opus4.8's last) and `f4fa502` (the tip GLM 5.2 inherited):
+
+  `3dd43bf` (Track A) → `52e04ea` (Tracks B/C/D/E) → `fefcfed` (audit-fixes) → `eb8c650` (boundary) → `0ec78ab` (boundary-fold) → `a88a9ef` (audit-fold-2) → `b0a1ed3` (audit-fold-3 / sticky-header) → `841de03` (container rename) → `b3e5f5e` (audit-fixes-2) → `f4fa502` (proceed-b-e)
+
+**Audit method:**
+  1. Verified no application code was touched in the minimax-m3 range (only `supabase/config.toml` — the owner-approved project_id rename — and 7 doc files).
+  2. Verified the `supabase/config.toml` rename is correct (`project_id = "pickurveggieerp-glm"`, lowercase for Docker compliance).
+  3. Verified the F2 fix landed: the click-path now points at repo B (line 44).
+  4. Checked all docs for stale repo-A URLs — found one unchecked file: `Stage_C_Initialization_and_Readiness_Assessment.md line 18`.
+  5. Checked the §15 audit checklist for stale SHAs and line references — found the "pending" placeholder pattern in §16, §17, §18.
+  6. Verified the money-path review §9 checkboxes are all `[x]` (the D1 fix from `fefcfed`).
+  7. Verified the 5 CAP-VG1 guards are documented in the spec but NOT yet built in `scripts/guards/` (consistent with "QUEUED, not faked").
+  8. Ran the full verification suite (lint + test + build) — all PASS on the inherited tip `f4fa502`.
+
+**Findings and fixes (this turn):**
+
+  - **F1 (defect — "pending" placeholders never folded):** §16, §17, and §18 headers all said "tip of this §X record: pending; will be folded to actual SHA in post-commit-and-push fold." The commits (`841de03`, `b3e5f5e`, `f4fa502`) had already landed with real SHAs, but minimax-m3 never followed through on the fold. §13 and §14 (which minimax-m3 also wrote) DO have real SHAs — the fold was done for those but not for §16-18. **Fixed:** all three "pending" placeholders folded to their actual commit SHAs (`841de03`, `b3e5f5e`, `f4fa502` respectively).
+  - **F2 (defect — stale repo-A URL in unchecked file):** `Stage_C_Initialization_and_Readiness_Assessment.md line 18` had a current-state claim "Remote | origin → github.com/noyanxtdoor-maker/pick-ur-veggie-farm ✅" without the boundary-decision context. This file was from commit `8c6dcb1` (opus4.8's era, 2026-06-20) and wasn't caught by minimax-m3's §15 audit checklist item #3. **Fixed:** added a "BEFORE the 2026-07-08 boundary decision" blockquote prefix immediately after the table, preserving the historical snapshot while clarifying it's not a current-state claim. The current remote binding (`origin` → repo B) is documented in the prefix.
+
+**No findings (verified correct):**
+  - The sticky-header convention in STATUS.md line 7 (`a88a9ef`) is correct — commits `841de03`, `b3e5f5e`, and `f4fa502` all modified STATUS.md §4 but did NOT touch the header line, so the header SHA is legitimately the last commit that modified it (`b0a1ed3` set the convention and pinned it to `a88a9ef`).
+  - The §15 audit checklist item #2 says "any GLM 5.2 audit-folds thereof" with "e.g." examples — this is intentionally open-ended and covers the now-longer chain.
+  - The verbatim ChatGPT transcripts in `source_chats/` contain repo-A URLs — these are VERBATIM captures and must NOT be scrubbed (commit `3bb498b` committed to "no interpretation, no summary — verbatim capture only").
+  - The §15 boundary decision text (`handoff:605`) mentions repo A — this is the boundary decision record itself, correct by definition.
+  - The 5 CAP-VG1 guards are documented in spec §5 (lines 110-122) but NOT built in `scripts/guards/` — consistent with "QUEUED, not faked."
+
+**What this turn did NOT do:**
+  - Did NOT start any track's build half (all remain QUEUED per §14 + §18).
+  - Did NOT touch repo A (boundary rule respected).
+  - Did NOT modify any code (0 lines of application code changed — only 3 doc files patched: the handoff, STATUS.md (via the §19 entry below), and Stage_C).
+  - Did NOT rewrite the verbatim ChatGPT transcripts (the repo-A URLs there are historical captures).
+
+**Session-end posture:** clean tree (the F1 + F2 fixes + this §19 record will be committed in one doc-only commit). Push to repo B (canonical) only. The §15 sticky-header convention is in effect.

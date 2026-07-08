@@ -286,3 +286,19 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   audit-trail entry. The build halves of B/C/D/E remain QUEUED, not faked, per the §14 commitment. Push to repo B
   only (canonical); repo A untouched (boundary rule). If the owner wants to authorize the build halves in a
   future session, the §18 record lists the prompt templates for each track.
+- **2026-07-08 (GLM 5.2 audit of minimax-m3's work — 2 defects found + fixed)** — Model switched from
+  minimax-m3 to GLM 5.2 (via Nvidia). Audited all 10 minimax-m3 commits (`3dd43bf` through `f4fa502`).
+  **F1 (defect):** §16, §17, §18 headers in the handoff all said "tip of this §X record: pending; will be
+  folded to actual SHA in post-commit-and-push fold" — but the commits had already landed with real SHAs.
+  minimax-m3 established this fold pattern with §13/§14 (which DO have real SHAs) but never followed through
+  on §16-18. **Fixed:** all three "pending" placeholders folded to `841de03`, `b3e5f5e`, `f4fa502`
+  respectively. **F2 (defect):** `Stage_C_Initialization_and_Readiness_Assessment.md line 18` had a stale
+  repo-A URL ("Remote | origin → github.com/noyanxtdoor-maker/pick-ur-veggie-farm ✅") without the
+  boundary-decision context. This file (from commit `8c6dcb1`, 2026-06-20) wasn't caught by minimax-m3's
+  §15 audit checklist item #3. **Fixed:** added a "BEFORE the 2026-07-08 boundary decision" blockquote prefix
+  preserving the historical snapshot while clarifying it's not a current-state claim. **No findings
+  (verified correct):** sticky-header convention (`a88a9ef` is the last commit that touched the header line,
+  not the absolute HEAD — correct by convention), money-path §9 checkboxes all `[x]`, 5 CAP-VG1 guards
+  documented in spec but NOT built in `scripts/guards/` (QUEUED, not faked), verbatim transcripts untouched.
+  Handoff §19 added (this audit-trail record). **Code: 0 lines changed.** Doc-only audit + fixes. Push to
+  repo B only (canonical); repo A untouched. All builds remain QUEUED, not faked, per §14 + §18.
