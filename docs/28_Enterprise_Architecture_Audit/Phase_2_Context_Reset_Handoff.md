@@ -860,7 +860,7 @@ If the owner wants to authorize the build halves to start in this terminal (or i
 
 ---
 
-### 20. Session 2026-07-08 (GLM 5.2 — Track B / CAP-VG1 Steps 1-4 + offline-degrade guard BUILT — Engineering Loop completed) (tip of this §20 record: pending — will be folded to actual SHA after commit+push)
+### 20. Session 2026-07-08 (GLM 5.2 — Track B / CAP-VG1 Steps 1-4 + offline-degrade guard BUILT — Engineering Loop completed) (tip of this §20 record: `23fb70e` — the post-commit-and-push fold was deferred from the original session; GLM 5.2 audit folded the `pending` placeholder to the actual SHA)
 
 **Authorization:** Owner's standing goal message: "build all remaining halves you have my permission, finish all task, finish phase 1 module, follow the loop command of quality building Engineering Loop Command Objective ↓ Define ↓ Challenge ↓ Attack ↓ Defend ↓ Audit ↓ Revise ↓ Decision ↓ Version Lock." This explicitly authorizes building the remaining track halves (superseding the §14 "QUEUED, not faked" commitment for buildable tracks).
 
