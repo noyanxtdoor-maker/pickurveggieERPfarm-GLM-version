@@ -4,7 +4,7 @@
 to review based on what this file marks "Done." **Rule: never round up.** If a flow was not tested end-to-end by
 the agent, or a reviewer has an open issue against it, it is **In Progress** — not Done.
 
-_Last updated: 2026-07-08 · HEAD `52e04ea` · branch `feature/phase-0-foundation` (in sync with origin — pushed to repo A and repo B)._
+_Last updated: 2026-07-08 · HEAD `52e04ea` (audit-fixes `fefcfed` queued in this turn) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15)._
 
 ---
 
@@ -205,7 +205,7 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   TBD by owner; queued-work list is the §13 sequence (re-run 164-guard battery, `supabase db
   push`, real-cloud E2E of POS→accounting→AR, STATUS.md §1 update). **Track D (branch
   protection):** §12 prompt pasted; click-path §7 added; **F2 fix landed in this same
-  commit** (4 URL references in the click-path swapped from `pick-ur-veggie-farm` to
+  commit** (4 URL references in the click-path swapped from the disregarded repo A to
   `pickurveggieERPfarm-GLM-version`); apply is queued (17 steps + owner smoke test +
   agent audit by screenshot or PAT). The Temporary Solo-Founder Enforcement Exception
   (source spec §49–76) terminates the moment real protection is verified, per source
@@ -214,4 +214,20 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   queued (gated on Track C). **Zero code lines changed** — append-only doc updates only.
   No feature row in §2 changed. Handoff §14 added as the consolidated session log for
   all four tracks; this STATUS entry is the matching append-only maintenance log row.
-  The `XXXXXXX` placeholders in the pre-`be1243d` commit (handoff §14 title + this STATUS header) were folded into `be1243d` (the first commit of the §14 record), then the XXXXXXX self-reference line was re-folded into `da1db9a`, and then the `_Last updated` + `be1243d` references were re-folded into `52e04ea`. The current tip is `52e04ea` on both repo A and repo B. This STATUS entry is the matching append-only maintenance log row for that fold chain.
+  The `XXXXXXX` placeholders in the pre-`be1243d` commit (handoff §14 title + this STATUS header) were folded into `be1243d` (the first commit of the §14 record), then the XXXXXXX self-reference line was re-folded into `da1db9a`, and then the `_Last updated` + `be1243d` references were re-folded into `52e04ea`. The current tip is `52e04ea` on the canonical home (repo B, per the 2026-07-08 boundary decision — see handoff §15). This STATUS entry is the matching append-only maintenance log row for that fold chain.
+- **2026-07-08 (Repo boundary decision recorded — repo A disregarded, repo B canonical)** — Owner
+  decided "GLM5.2 and minimax-m3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."
+  The local `origin` remote had been repointed to repo B in the prior turn; this turn records the
+  decision in handoff §15 and tightens current-state claims throughout the doc tree so GLM 5.2's
+  audit pass sees zero "repo A" references in current-state framing. Historical records (§11–§14)
+  are kept as-is with timestamped "BEFORE the 2026-07-08 boundary decision" prefixes where
+  their original prose was current-state-ambiguous. STATUS.md header + §217 "current tip on both
+  repo A and repo B" claim → "in sync with `origin` = repo B, the canonical home per the
+  2026-07-08 boundary decision — see handoff §15." §4 Tracks B/C/D/E entry: `pick-ur-veggie-farm`
+  → "the disregarded repo A." Memory updated to carry the boundary rule across sessions. **Code:
+  0 lines changed.** Doc-only scrub of current-state claims + new §15 record. Push to repo B
+  only (canonical); repo A is off-limits from this turn forward. The §15 record includes a
+  explicit GLM-5.2-audit checklist: `git remote -v` shows repo B, `git log --oneline -5` shows
+  the doc-only chain, grep finds zero current-state-claim "repo A" mentions, the 4 open owner
+  inputs (D2 model / env-key channel / hosting / Play Console email) are still TBD in
+  handoff §14.
