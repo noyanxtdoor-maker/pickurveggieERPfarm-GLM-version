@@ -4,7 +4,7 @@
 to review based on what this file marks "Done." **Rule: never round up.** If a flow was not tested end-to-end by
 the agent, or a reviewer has an open issue against it, it is **In Progress** — not Done.
 
-_Last updated: 2026-07-08 · HEAD `52e04ea` (audit-fixes `fefcfed` queued in this turn) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15)._
+_Last updated: 2026-07-08 · HEAD `0ec78ab` (boundary-record fold; underneath: `eb8c650` boundary record + `fefcfed` audit-fixes) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15)._
 
 ---
 
@@ -214,9 +214,9 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   queued (gated on Track C). **Zero code lines changed** — append-only doc updates only.
   No feature row in §2 changed. Handoff §14 added as the consolidated session log for
   all four tracks; this STATUS entry is the matching append-only maintenance log row.
-  The `XXXXXXX` placeholders in the pre-`be1243d` commit (handoff §14 title + this STATUS header) were folded into `be1243d` (the first commit of the §14 record), then the XXXXXXX self-reference line was re-folded into `da1db9a`, and then the `_Last updated` + `be1243d` references were re-folded into `52e04ea`. The current tip is `52e04ea` on the canonical home (repo B, per the 2026-07-08 boundary decision — see handoff §15). This STATUS entry is the matching append-only maintenance log row for that fold chain.
+  The `XXXXXXX` placeholders in the pre-`be1243d` commit (handoff §14 title + this STATUS header) were folded into `be1243d` (the first commit of the §14 record), then the XXXXXXX self-reference line was re-folded into `da1db9a`, and then the `_Last updated` + `be1243d` references were re-folded into `52e04ea`. The current tip is `0ec78ab` (GLM 5.2 boundary-fold; its parent is `eb8c650`, the boundary-record commit; its grandparent is `fefcfed`, the audit-fixes commit). All three are on the canonical home (repo B, per the 2026-07-08 boundary decision — see handoff §15). This STATUS entry is the matching append-only maintenance log row for that fold chain.
 - **2026-07-08 (Repo boundary decision recorded — repo A disregarded, repo B canonical)** — Owner
-  decided "GLM5.2 and minimax-m3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."
+  decided "GLM5.2 and minimaxm3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."
   The local `origin` remote had been repointed to repo B in the prior turn; this turn records the
   decision in handoff §15 and tightens current-state claims throughout the doc tree so GLM 5.2's
   audit pass sees zero "repo A" references in current-state framing. Historical records (§11–§14)
@@ -231,3 +231,12 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   the doc-only chain, grep finds zero current-state-claim "repo A" mentions, the 4 open owner
   inputs (D2 model / env-key channel / hosting / Play Console email) are still TBD in
   handoff §14.
+- **2026-07-08 (GLM 5.2 audit pass — boundary record verified, 2 self-reference defects found + fixed in `0ec78ab`)** — GLM 5.2
+  (the restored primary, via Nvidia) ran the §15 audit checklist against commit `eb8c650` and found 2 self-reference defects
+  that became stale the moment `eb8c650` landed: (a) the §15 title said "tip of this §15 record: pending" (the commit had
+  already landed as `eb8c650`); (b) §15 audit checklist item #2 listed valid tips as `3dd43bf` / `52e04ea` / `fefcfed` but
+  not `eb8c650` itself. Both folded to the actual SHAs in commit `0ec78ab` (pushed to repo B, fast-forward `eb8c650..0ec78ab`).
+  This STATUS row + the header update + the STATUS §217 "current tip" update are the matching append-only log entries.
+  **Code: 0 lines changed.** Doc-only self-reference fold. Repo A untouched (per boundary rule). The §15 audit checklist
+  was additionally hardened: item #2 now reads "tip is `eb8c650` OR a fold descendant thereof (all doc-only)" so future
+  fold commits don't re-stale the checklist.

@@ -622,7 +622,7 @@ modified, no guard added, no `supabase` command issued.
 **What the next GLM 5.2 audit pass should verify (the §15 check):**
 
 1. Run `git remote -v` — confirm `origin` points at `pickurveggieERPfarm-GLM-version` (canonical), not `pick-ur-veggie-farm` (disregarded).
-2. Run `git log --oneline -5` — confirm the local tip is one of `3dd43bf` (Track A), `52e04ea` (Tracks B/C/D/E), `fefcfed` (audit-fixes), or `eb8c650` (this §15 boundary record) — the doc-only record chain. The tip should NOT be a code-bearing commit.
+2. Run `git log --oneline -5` — confirm the local tip is `eb8c650` (this §15 boundary record) OR a fold descendant thereof (all doc-only — e.g. `0ec78ab` is the GLM 5.2 audit-fold of `eb8c650`). The tip should NOT be a code-bearing commit. The full doc-only chain is: `3dd43bf` (Track A) → `52e04ea` (Tracks B/C/D/E) → `fefcfed` (audit-fixes) → `eb8c650` (§15 boundary record) → any GLM 5.2 audit-folds thereof.
 3. Grep the doc tree for any current-state claim that says "repo A" without "disregarded" / "before the boundary decision" / "see §15" context. The current state (post-this-turn) has zero such claims.
 4. Grep the doc tree for live URLs — every `github.com/noyanxtdoor-maker/...` URL in the docs should point at `pickurveggieERPfarm-GLM-version` (canonical) and never at `pick-ur-veggie-farm` (disregarded), except in the §15 audit checklist above where the meta-narrative is intentional.
 5. Confirm the 4 open owner inputs (D2 model, env-key channel, hosting, Play Console email) are still recorded as TBD in handoff §14 — these are the gating owner decisions; if GLM 5.2 sees a placeholder resolved, that means an owner prompt was processed.
