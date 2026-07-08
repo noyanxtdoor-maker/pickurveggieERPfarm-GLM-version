@@ -925,7 +925,7 @@ If the owner wants to authorize the build halves to start in this terminal (or i
 
 ---
 
-### 21. Session 2026-07-08 (GLM 5.2 — Track B Step 5 Edge Function + 4 remaining guards BUILT — Engineering Loop complete) (tip of this §21 record: pending — will be folded to actual SHA after commit+push)
+### 21. Session 2026-07-08 (GLM 5.2 — Track B Step 5 Edge Function + 4 remaining guards BUILT — Engineering Loop complete) (tip of this §21 record: `7320a9a` — repo B `feature/phase-0-foundation`, pushed 2026-07-08)
 
 **Authorization:** Owner's message: "complete step 5, do you need any details from that? if you need keys/password on my side, just ask me or give me instructions of how to do it on my side, complete track A C D and E." This explicitly authorizes building step 5 (the Cloud Edge Function + the 4 remaining guards) and attempting all remaining tracks.
 
