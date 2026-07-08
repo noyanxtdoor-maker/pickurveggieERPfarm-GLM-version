@@ -590,7 +590,7 @@ modified, no guard added, no `supabase` command issued.
 
 ---
 
-### 15. Session 2026-07-08 (Repo boundary decision — repo A disregarded, repo B canonical) — assistant framing for GLM 5.2 audit (tip of this §15 record: pending; intermediate SHAs: queued in this turn)
+### 15. Session 2026-07-08 (Repo boundary decision — repo A disregarded, repo B canonical) — assistant framing for GLM 5.2 audit (tip of this §15 record: `eb8c650`; intermediate SHAs: none — clean single commit, then this post-audit fold)
 
 **Decision (verbatim, owner message):** "GLM5.2 and minimaxm3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."
 
@@ -622,7 +622,7 @@ modified, no guard added, no `supabase` command issued.
 **What the next GLM 5.2 audit pass should verify (the §15 check):**
 
 1. Run `git remote -v` — confirm `origin` points at `pickurveggieERPfarm-GLM-version` (canonical), not `pick-ur-veggie-farm` (disregarded).
-2. Run `git log --oneline -5` — confirm the local tip is one of `3dd43bf` (Track A), `52e04ea` (Tracks B/C/D/E), or `fefcfed` (audit-fixes) — the doc-only record chain. The tip should NOT be a code-bearing commit.
+2. Run `git log --oneline -5` — confirm the local tip is one of `3dd43bf` (Track A), `52e04ea` (Tracks B/C/D/E), `fefcfed` (audit-fixes), or `eb8c650` (this §15 boundary record) — the doc-only record chain. The tip should NOT be a code-bearing commit.
 3. Grep the doc tree for any current-state claim that says "repo A" without "disregarded" / "before the boundary decision" / "see §15" context. The current state (post-this-turn) has zero such claims.
 4. Grep the doc tree for live URLs — every `github.com/noyanxtdoor-maker/...` URL in the docs should point at `pickurveggieERPfarm-GLM-version` (canonical) and never at `pick-ur-veggie-farm` (disregarded), except in the §15 audit checklist above where the meta-narrative is intentional.
 5. Confirm the 4 open owner inputs (D2 model, env-key channel, hosting, Play Console email) are still recorded as TBD in handoff §14 — these are the gating owner decisions; if GLM 5.2 sees a placeholder resolved, that means an owner prompt was processed.
@@ -636,5 +636,7 @@ modified, no guard added, no `supabase` command issued.
 - Did NOT scrub every "repo A" substring from the doc tree — only current-state claims. Historical-context mentions (the F2-fix narrative, the local Docker container name) are kept because they document what was fixed / what the local env is.
 
 **Session-end posture:** clean tree (the §15 record + the small current-state-claim tightenings will be committed in one commit). The new tip will be the commit made for this §15 record. Push to the canonical home (repo B) only — the local `origin` is bound to repo B, so a bare `git push` is safe; an explicit `git push` with the repo B URL is the safer equivalent.
+
+**Post-commit-and-push fold (GLM 5.2 audit turn, same session):** the §15 record was committed as `eb8c650` and pushed to repo B (fast-forward `fefcfed..eb8c650`). The commit is on the canonical home only; repo A was not touched. The stale `pending` placeholder in the §15 title above was then folded to the actual SHA `eb8c650` in a follow-up commit (this turn). The §15 audit checklist item #2 was likewise updated to include `eb8c650` in the valid-tip list (the audit found item #2 was stale the moment §15 landed, because the checklist didn't list its own commit as a valid tip). Both folds are doc-only; no code changed.
 
 **Role framing (owner, 2026-07-08):** "YOU ARE JUST AN ASSISTANT TO GLM5.2 WHILE WAITING FOR IT TO BE RESTORED." Per this framing, the goal of every minimax-m3 session in this repo from this point forward is: complete the doc-only record halves of the queued owner-gated work, leave the build halves explicitly QUEUED, and pre-position the state so GLM 5.2's next audit pass can verify the doc-side work in one read. The handoff's standing rule (CLAUDE.md §8 + charter §4.5) — "END by updating the handoff" — is the same as before; this §15 record is the END-of-session update for this turn.
