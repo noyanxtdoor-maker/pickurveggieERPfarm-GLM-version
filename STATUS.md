@@ -240,3 +240,17 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   **Code: 0 lines changed.** Doc-only self-reference fold. Repo A untouched (per boundary rule). The §15 audit checklist
   was additionally hardened: item #2 now reads "tip is `eb8c650` OR a fold descendant thereof (all doc-only)" so future
   fold commits don't re-stale the checklist.
+- **2026-07-08 (Local Docker container rename — Option 1+2 boundary hardening, owner-approved)** — Owner
+  approved "Option 1+2" in response to the question "repo A and B both using the same container, will that not
+  effect both repos?" — the answer: yes, same derived container name; Option 2 fixes it. `supabase/config.toml` line 5
+  `project_id = "pick-ur-veggie-farm"` → `project_id = "pickurveggieerp-glm"` (lowercase, per Docker container-name
+  rules — the repo URL has mixed case which Docker rejects). Resulting local container name:
+  `supabase_db_pickurveggieerp-glm` (down from `supabase_db_pick-ur-veggie-farm`). Cloud Supabase project
+  `jabjyvdkadcbfocaerno` is UNCHANGED — the link is per-checkout via `supabase/.temp/project-ref` (gitignored).
+  Doc-tree updates in the same commit: handoff §236 guard command (new container name); Stage D handoff §66 guard
+  command (same); handoff §15 audit-checklist table line 614 entry (now says "renamed 2026-07-08, see §16").
+  Handoff §16 added (the matching session log entry). **Code: 0 lines changed.** Doc-only + one config-string
+  change. Push to repo B only (canonical); repo A untouched (boundary rule). The §15 sticky-header convention
+  is in effect: the `_Last updated` SHA in this STATUS header will lag the actual tip by one commit (this is
+  the convention; see handoff §15 audit checklist item #2). The 9-step migration checklist for the next
+  env-capable session (env-blocked in this terminal — no Docker) is in handoff §16.

@@ -2,7 +2,15 @@
 # https://supabase.com/docs/guides/local-development/cli/config
 # A string used to distinguish different Supabase projects on the same host. Defaults to the
 # working directory name when running `supabase init`.
-project_id = "pick-ur-veggie-farm"
+# Renamed 2026-07-08 from "pick-ur-veggie-farm" to "pickurveggieerp-glm" (lowercase, per Docker
+# container-name rules). Reason: repo A and repo B share the same codebase, so without this
+# rename both checkouts would derive the same container name (`supabase_db_<project_id>`) and
+# collide if both tried to run `supabase start` on the same host. The 2026-07-08 boundary
+# decision (handoff §15) disregards repo A, so the typical case is one checkout only — but
+# the rename makes any cross-checkout debugging visible (different container name in `docker
+# ps`). The cloud Supabase project (jabjyvdkadcbfocaerno) is unaffected: the link is stored
+# in `supabase/.temp/project-ref` (gitignored) and is set per-checkout by `supabase link`.
+project_id = "pickurveggieerp-glm"
 
 [api]
 enabled = true

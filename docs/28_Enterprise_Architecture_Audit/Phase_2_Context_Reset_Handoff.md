@@ -233,7 +233,7 @@ inside the ERP"). Org-admin + Crop-catalog modules are **FROZEN** (supporting, n
 
 ## 4. Environment & constraints
 Windows + PowerShell/Git-Bash. Supabase local needs **Docker Desktop** (`npx supabase db reset`); `psql` NOT on
-PATH → run guards via `docker exec -i supabase_db_pick-ur-veggie-farm psql -U postgres -d postgres -v
+PATH → run guards via `docker exec -i supabase_db_pickurveggieerp-glm psql -U postgres -d postgres -v
 ON_ERROR_STOP=1 -q < scripts/guards/<file>.sql`. **Cannot fetch GitHub Actions** (owner pastes; you audit).
 Cloud Supabase project `jabjyvdkadcbfocaerno` is **linked, remote schema EMPTY** (8+ migrations local-only;
 `supabase db push` is a separate, owner-gated deploy decision). Subagents/workflows may hit session limits —
@@ -611,7 +611,7 @@ modified, no guard added, no `supabase` command issued.
 | File | Line | Reference type | Audit verdict |
 |---|---|---|---|
 | `Phase_2_Branch_Protection_ClickPath.md` | 228 | F2-fix narrative (meta-narrative documenting the fix) | **Keep as-is.** It says "previously referenced the disregarded repo A; now all point at repo B" — that's a historical record of the fix, not a current-state claim. |
-| `Phase_2_Context_Reset_Handoff.md` | 236 | Local Docker container name `supabase_db_pick-ur-veggie-farm` | **Keep as-is.** This is a Docker container name, not a repo URL. It's a local process identifier; the `pick-ur-veggie-farm` substring is a project-name coincidence from the repo's original name. |
+| `Phase_2_Context_Reset_Handoff.md` | 236 | Local Docker container name `supabase_db_pickurveggieerp-glm` (renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `3bb49a7` and the §16 entry below) | **Keep as-is-with-update.** The container name is a local process identifier, not a repo URL. The §236 guard command was updated to match the new name in the same commit that renamed `supabase/config.toml` `project_id`. |
 | `Phase_2_Context_Reset_Handoff.md` | 484, 486 | §13 historical record ("BEFORE the 2026-07-08 boundary decision") | **Keep as-is with boundary context added in this turn.** The record describes what was true when it was written. |
 | `Phase_2_Context_Reset_Handoff.md` | 557 | §14 historical record of the F2 fix | **Keep as-is with boundary context added in this turn.** Same as above. |
 | `STATUS.md` | 7, 217 | Current-state claims | **Fixed in this turn.** Replaced "pushed to repo A and repo B" with "in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15." |
@@ -640,3 +640,58 @@ modified, no guard added, no `supabase` command issued.
 **Post-commit-and-push fold (GLM 5.2 audit turn, same session):** the §15 record was committed as `eb8c650` and pushed to repo B (fast-forward `fefcfed..eb8c650`). The commit is on the canonical home only; repo A was not touched. The stale `pending` placeholder in the §15 title above was then folded to the actual SHA `eb8c650` in a follow-up commit (this turn). The §15 audit checklist item #2 was likewise updated to include `eb8c650` in the valid-tip list (the audit found item #2 was stale the moment §15 landed, because the checklist didn't list its own commit as a valid tip). Both folds are doc-only; no code changed.
 
 **Role framing (owner, 2026-07-08):** "YOU ARE JUST AN ASSISTANT TO GLM5.2 WHILE WAITING FOR IT TO BE RESTORED." Per this framing, the goal of every minimax-m3 session in this repo from this point forward is: complete the doc-only record halves of the queued owner-gated work, leave the build halves explicitly QUEUED, and pre-position the state so GLM 5.2's next audit pass can verify the doc-side work in one read. The handoff's standing rule (CLAUDE.md §8 + charter §4.5) — "END by updating the handoff" — is the same as before; this §15 record is the END-of-session update for this turn.
+
+---
+
+### 16. Session 2026-07-08 (Local Docker container rename — Option 1+2 boundary hardening) — owner-approved (tip of this §16 record: pending; will be folded to actual SHA in post-commit-and-push fold)
+
+**Owner decision (verbatim):** "yes do option 1+2" (in response to the Option 1+2 recommendation: don't checkout repo A; rename repo B's local project_id so any future cross-checkout debugging is visible).
+
+**Option 1: Don't checkout repo A.**
+
+  - Already enforced by the 2026-07-08 boundary decision (see §15). Repo A is DISREGARDED; opus 4.8 owns it in its own sessions. This model (minimax-m3) and GLM 5.2 do not clone, fetch, or push repo A.
+  - The current working tree has `origin` bound to repo B (canonical) — a bare `git push`/`git fetch` goes to repo B (see §15 for the repointing commit).
+  - **No code or config change required for Option 1.** It's a workflow rule, not a file change. Owner carries it forward.
+
+**Option 2: Rename repo B's local `project_id` so the local Docker container is distinct.**
+
+  - **What changed:** `supabase/config.toml` line 5 — `project_id = "pick-ur-veggie-farm"` → `project_id = "pickurveggieerp-glm"`.
+  - **Why this string (not the full repo URL):** Docker container names must be lowercase. The repo URL `pickurveggieERPfarm-GLM-version` has mixed case, so a verbatim copy would be rejected by the Docker daemon on first `supabase start`. The chosen form is lowercase, retains the "ERP" and "GLM" hints, and is short enough to fit in a one-line `docker ps` listing.
+  - **Resulting container name:** `supabase_db_pickurveggieerp-glm` (down from `supabase_db_pick-ur-veggie-farm`).
+  - **Cloud project (jabjyvdkadcbfocaerno) is UNCHANGED.** The cloud link is stored in `supabase/.temp/project-ref` (gitignored) and is set per-checkout by `supabase link --project-ref jabjyvdkadcbfocaerno`. Renaming `project_id` only affects the local container name + the local Docker volume name. After this change, the next `supabase start` in repo B's checkout will create a fresh local volume (no migration history from the old `supabase_db_pick-ur-veggie-farm` volume). The 8+ local migrations are re-discovered from `supabase/migrations/` on the next `supabase db reset`.
+  - **What did NOT change:** the cloud project ref, the linked project, the migration files, the guard scripts, the RLS policies, the auth config, the storage buckets, the edge functions, or any other cloud-side state. `supabase status` after the next `supabase start` will show the same local API URL (port 54321) and the same local DB URL (port 54322); the container ID will be different.
+
+**What this means for the doc tree (also landed in the same commit):**
+
+  - `docs/28_Enterprise_Architecture_Audit/Phase_2_Context_Reset_Handoff.md` line 236 — guard command `supabase_db_pick-ur-veggie-farm` → `supabase_db_pickurveggieerp-glm` (the new container name).
+  - `docs/28_Enterprise_Architecture_Audit/Stage_D_Phase_1_Context_Reset_Handoff.md` line 66 — same guard-command rename.
+  - `docs/28_Enterprise_Architecture_Audit/Phase_2_Context_Reset_Handoff.md` line 614 (§15 audit checklist table) — updated entry: the container-name row now says "renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `3bb49a7` and this §16 entry" and the verdict changed from "Keep as-is" to "Keep as-is-with-update" (the §236 guard command was updated to match the new name in the same commit).
+
+**What did NOT change in the doc tree (intentionally kept):**
+
+  - All `pick-ur-veggie-farm` references that are about the **disregarded repo A** (URL mentions, the §15 boundary-decision narrative, the F2-fix meta-narrative in click-path §7, etc.) — these are not container names; they are repo-A identifiers and are correct as historical/current-state claims. Do NOT change them. See the §15 repo-A audit table for the keep-as-is list.
+  - The `XXXXXXX` placeholders in the §13 + §14 records — those are SHA-fold-history documentation, not container names. Unrelated to this rename.
+  - The local Docker port numbers (54321, 54322, 54320, 54329) — those are hard-coded in `config.toml` and unchanged. Two simultaneous `supabase start` invocations (e.g., from repo A and repo B checkouts) would still collide on the port; Option 2 makes them distinguishable by container name, but the port-binding collision is a separate workflow constraint (run one at a time).
+
+**Migration step for the next env-capable session (env-blocked in this terminal — no Docker, no supabase CLI):**
+
+  1. `supabase stop` (in the current repo B checkout, if a stack is already running) — stops the OLD container.
+  2. `docker volume ls | grep supabase_db_pick-ur-veggie-farm` — confirms the old volume name exists. Note: the old volume contains the local migration history; deleting it is safe (the migrations re-apply from `supabase/migrations/` on next `db reset`).
+  3. `docker volume rm supabase_db_pick-ur-veggie-farm` — removes the old volume. **OPTIONAL:** only needed if disk space is tight. Skipping this step leaves the old volume orphaned (harmless; takes ~100-500 MB depending on guard runs).
+  4. `npm run db:start` (or `npx supabase start`) — starts the NEW container (`supabase_db_pickurveggieerp-glm`) on the same ports, with a fresh empty volume.
+  5. `npm run db:reset` — re-runs the 8+ local migrations; volume is now seeded.
+  6. `npm run guard:static` and `npm run guard:db` (if `psql` is on PATH) — re-run the 164-guard battery. Expect 164 PASS / 0 DEFECT on the fresh volume; same result as the pre-rename state.
+  7. `supabase link --project-ref jabjyvdkadcbfocaerno` — re-link to the cloud project. (Should already be linked from prior session; verify with `supabase status`.)
+  8. Append the `db:start` event to this handoff §16 (post-migration addendum) and STATUS.md §4 (append-only log row) with timestamp + guard-battery result.
+  9. `supabase db push` to the cloud — this is the Track A build step, separate from this rename. Still env-blocked and owner-gated per handoff §13.
+
+**What this session did NOT do (scope discipline):**
+
+  - Did NOT run `supabase stop`, `docker volume rm`, `supabase start`, `supabase db reset`, or `supabase db push` — all env-blocked in this terminal (no Docker, no supabase CLI).
+  - Did NOT touch repo A. Boundary rule respected.
+  - Did NOT start any of the 5 tracks' build halves (Track A db push / B2 build; Track B CAP-VG1 steps 1-4; Track C Supabase+hosting; Track D branch protection apply; Track E Play packaging) — all still QUEUED in handoff §13 + §14 for the next env-capable session.
+  - Did NOT change the cloud project ref (`jabjyvdkadcbfocaerno`) or the cloud link.
+  - Did NOT change the port numbers in `config.toml`.
+  - Did NOT change the `package.json` `db:start` / `db:stop` / `db:status` scripts.
+
+**Session-end posture:** clean tree (the rename + doc updates + this §16 record will be committed in one commit). The new tip will be the commit made for this §16 record. Push to the canonical home (repo B) only. The §15 sticky-header convention is in effect: the STATUS.md `_Last updated` SHA will lag the actual tip by one commit (this is the convention; see §15 audit checklist item #2 for the auditor's git-log command).
