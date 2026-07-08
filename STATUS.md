@@ -4,7 +4,7 @@
 to review based on what this file marks "Done." **Rule: never round up.** If a flow was not tested end-to-end by
 the agent, or a reviewer has an open issue against it, it is **In Progress** — not Done.
 
-_Last updated: 2026-07-08 · HEAD `0ec78ab` (boundary-record fold; underneath: `eb8c650` boundary record + `fefcfed` audit-fixes) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15)._
+_Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `0ec78ab` boundary-fold → `eb8c650` boundary record → `fefcfed` audit-fixes) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15). Sticky-header convention: this SHA is the LAST commit that modified this header line; `git log --oneline -5` is the source of truth for the actual tip — see handoff §15.
 
 ---
 
