@@ -33,7 +33,9 @@ begin
   end if;
 end $$;
 
--- ── 3. Verify NO new permissions were added for copilot (copilot.use is step 5, not steps 1-4) ──
+-- ── 3. Verify the copilot.use permission exists (step 5 migration) ──
+-- After step 5, the copilot.use permission SHOULD exist (informational tier).
+-- Steps 1-4 had zero DB surface; step 5 adds only this one permission row.
 do $$
 declare
   copilot_perm_count int;
@@ -42,10 +44,12 @@ begin
   from public.permissions
   where permission_key like '%copilot%' or permission_key like '%veggiegenius%';
 
-  if copilot_perm_count > 0 then
-    raise exception 'DEFECT: CAP-VG1 steps 1-4 added % permission(s) — copilot.use is step 5 (Edge Function), not steps 1-4. Found: %',
-      copilot_perm_count,
-      (select string_agg(permission_key, ', ') from public.permissions where permission_key like '%copilot%' or permission_key like '%veggiegenius%');
+  if copilot_perm_count = 0 then
+    raise notice 'NOTE: no copilot permissions found — step 5 migration not yet applied. Steps 1-4 are client-only.';
+  elsif copilot_perm_count = 1 then
+    raise notice 'PASS: copilot.use permission exists (step 5 migration applied)';
+  else
+    raise exception 'DEFECT: unexpected copilot permissions — expected 0 (pre-step-5) or 1 (copilot.use). Found: %', copilot_perm_count;
   end if;
 end $$;
 

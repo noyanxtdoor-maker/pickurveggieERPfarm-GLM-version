@@ -922,3 +922,90 @@ If the owner wants to authorize the build halves to start in this terminal (or i
 - MODIFIED: `app/features/settings/SettingsScreen.tsx`, `app/core/routing/router.tsx`, `app/components/layout/AppShell.tsx`, `app/core/auth/session.tsx`, `package.json`
 
 **Session-end posture:** tree has 10 changed files (5 new, 5 modified). Will be committed in one `feat(cap-vg1)` commit + pushed to repo B (canonical) only. Repo A untouched. The §15 sticky-header convention is in effect.
+
+---
+
+### 21. Session 2026-07-08 (GLM 5.2 — Track B Step 5 Edge Function + 4 remaining guards BUILT — Engineering Loop complete) (tip of this §21 record: pending — will be folded to actual SHA after commit+push)
+
+**Authorization:** Owner's message: "complete step 5, do you need any details from that? if you need keys/password on my side, just ask me or give me instructions of how to do it on my side, complete track A C D and E." This explicitly authorizes building step 5 (the Cloud Edge Function + the 4 remaining guards) and attempting all remaining tracks.
+
+**Engineering Loop execution (Step 5):**
+
+1. **DEFINE:** Mapped CAP-VG1 spec §6 step 5 to: (a) a DB migration adding `copilot.use` permission to the catalog, (b) a Supabase Edge Function (`supabase/functions/copilot-ask/index.ts`) that authenticates via user JWT, checks `copilot.use` permission, calls LM Studio with grounding context, logs `copilot.turn` audit events, and enforces a money-path blocklist, (c) 4 guard SQL scripts (perm-isolation, rls-passthrough, money-immutability, no-bypass) testing spec §5 invariants.
+
+2. **CHALLENGE:** Attack-surface review against CLAUDE.md §6 tripwires:
+   - Multi-tenant security & RLS (B1/C7 §2): The Edge Function creates a Supabase client with the user's JWT — all reads go through RLS. The migration adds only a permission-catalog INSERT (no RLS policy changes). ✓
+   - Authentication (B7): The Edge Function extracts the JWT from the Authorization header and validates via `getUser()`. No auth changes. ✓
+   - Financial integrity (B2/C7 §4): The Edge Function has a MONEY_PATH_BLOCKLIST (pos_record_sale, pos_void_sale, record_cash_entry, payroll_disburse_wage, etc.) — any prompt mentioning these is blocked with 403. The migration adds no financial functions. ✓
+   - Audit boundaries (B6): The Edge Function inserts `copilot.turn` rows into `audit_events` using the user's JWT. The answer is NOT stored (client-only per spec §4). Only prompt hash + grounded sources + model id are logged. ✓
+   - No service_role in browser: The Edge Function holds no service_role key; it uses the user's JWT for all operations. ✓
+
+3. **ATTACK:** Wrote 7 new files + 2 patches:
+   - `supabase/migrations/20260708120000_cap_vg1_copilot_permission.sql` — adds `copilot.use` permission to the catalog (informational tier, additive INSERT).
+   - `supabase/functions/copilot-ask/index.ts` — 250+ lines: Deno Edge Function with auth, permission check, LM Studio call, money-path blocklist, audit logging, offline-degrade.
+   - `scripts/guards/cap-vg1-perm-isolation.sql` — verifies `copilot.use` permission exists in the catalog.
+   - `scripts/guards/cap-vg1-rls-passthrough.sql` — verifies no copilot-specific RLS bypass policies exist (all reads via user JWT).
+   - `scripts/guards/cap-vg1-money-immutability.sql` — verifies the copilot migration created no new functions (no money-path surface added).
+   - `scripts/guards/cap-vg1-no-bypass.sql` — verifies no service_role bypass is configured.
+   - PATCHED `scripts/guards/cap-vg1-offline-degrade.sql` — updated to allow 0 or 1 copilot permission (step 5 migration expected to add it).
+   - PATCHED `tsconfig.json` — added `"exclude": ["node_modules", "dist", "supabase/functions"]` (Deno Edge Functions use Deno runtime types not available to tsc).
+   - PATCHED `package.json` — added 4 new `guard:copilot:*` npm scripts.
+
+4. **DEFEND:** Guard battery (all via docker exec into `supabase_db_pick-ur-veggie-farm`):
+   - `npm run guard:static`: PASS (only pre-existing `.tmp_capture` false-positive).
+   - `cap-vg1-offline-degrade.sql`: PASS — "copilot.use permission exists (step 5 migration applied)".
+   - `cap-vg1-perm-isolation.sql`: PASS — "copilot.use permission exists in catalog (1 rows)".
+   - `cap-vg1-rls-passthrough.sql`: PASS — "no copilot-specific RLS bypass policies".
+   - `cap-vg1-money-immutability.sql`: PASS — "copilot migration created no new functions (no money-path surface added)".
+   - `cap-vg1-no-bypass.sql`: PASS — "no service_role bypass configured".
+   - Fixed 2 Defend-phase issues: (a) offline-degrade guard flagged the step 5 permission as a defect — updated to allow 0 or 1 `copilot.use` permission; (b) money-immutability guard flagged pre-existing RPC grants as copilot-caused — rescoped to check only copilot-migration-introduced functions.
+
+5. **AUDIT:** Full verification:
+   - `npm run lint` (tsc --noEmit): exit 0 ✓
+   - `npm run test`: 18 files, 89 tests, 0 fail ✓
+   - `npm run build`: exit 0 (built in 5.92s) ✓
+   - Money-path audit: the Edge Function has a code-enforced blocklist + the migration adds zero financial functions ✓
+   - Scope audit: migration is additive (permission INSERT only), Edge Function reads under user JWT (RLS applies), no new tables, no RLS policy changes, no new grants ✓
+
+6. **REVISE:** No defects found in Audit — SKIPPED.
+
+7. **DECISION:** Build verdict: **PASS** with evidence. All 5 CAP-VG1 §5 guards now exist and PASS locally. The Edge Function is written but NOT yet deployed to cloud (blocked on Track A `supabase db push`).
+
+**What was BUILT (not queued):**
+- Step 5 Edge Function code (`supabase/functions/copilot-ask/index.ts`) — ready for `supabase functions deploy`
+- Step 5 migration (`supabase/migrations/20260708120000_cap_vg1_copilot_permission.sql`) — ready for `supabase db push`
+- All 4 remaining guards (perm-isolation, rls-passthrough, money-immutability, no-bypass) — written + PASS locally
+- Updated offline-degrade guard to handle the step 5 permission
+
+**What remains QUEUED (env-blocked):**
+- `supabase functions deploy copilot-ask` — needs Supabase cloud env (Track A/C)
+- `supabase db push` — needs `SUPABASE_DB_PASSWORD` (Track A)
+- Track C: hosting deploy — needs owner to choose hosting provider + provide `VITE_SUPABASE_ANON_KEY`
+- Track D: branch protection — owner-only GitHub UI click-path (17 steps in `Phase_2_Branch_Protection_ClickPath.md`)
+- Track E: Play packaging — BLOCKED on Track C + Play Console email
+
+**Owner instructions for unblocking remaining tracks:**
+
+Track A (cloud DB push):
+- Docker daemon IS running (verified: 4 containers up)
+- Supabase CLI 2.107.0 IS installed
+- Cloud project `jabjyvdkadcbfocaerno` IS linked
+- ONLY missing: `SUPABASE_DB_PASSWORD` environment variable
+- Owner: set this env var or tell me the password (won't be committed to git)
+
+Track C (hosting):
+- Owner: tell me which hosting provider (Vercel / Netlify / Cloudflare Pages)
+- Owner: provide `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` from the Supabase dashboard (Settings → API)
+
+Track D (branch protection):
+- Owner: follow the 17-step click-path in `Phase_2_Branch_Protection_ClickPath.md` and paste a screenshot, OR provide a GitHub PAT with `repo` scope
+
+Track E (Play packaging):
+- BLOCKED on Track C landing first
+- Owner: provide Play Console email (needed when Bubblewrap runs)
+
+**Files changed (9 total):**
+- NEW: `supabase/migrations/20260708120000_cap_vg1_copilot_permission.sql`, `supabase/functions/copilot-ask/index.ts`, `scripts/guards/cap-vg1-perm-isolation.sql`, `scripts/guards/cap-vg1-rls-passthrough.sql`, `scripts/guards/cap-vg1-money-immutability.sql`, `scripts/guards/cap-vg1-no-bypass.sql`
+- MODIFIED: `scripts/guards/cap-vg1-offline-degrade.sql`, `tsconfig.json`, `package.json`
+
+**Session-end posture:** 9 changed files (6 new, 3 modified). Will be committed in one `feat(cap-vg1-step5)` commit + pushed to repo B. Repo A untouched. §15 sticky-header convention in effect.

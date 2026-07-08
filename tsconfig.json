@@ -42,5 +42,6 @@
     //   "exactOptionalPropertyTypes": true,          // (1)
     //   "noPropertyAccessFromIndexSignature": true   // (4)
     // New V3 code MUST be written to satisfy the full strict set above.
-  }
+  },
+  "exclude": ["node_modules", "dist", "supabase/functions"]
 }

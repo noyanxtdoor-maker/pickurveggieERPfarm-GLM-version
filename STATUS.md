@@ -322,3 +322,17 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   needs `SUPABASE_DB_PASSWORD`); Track D (branch protection — needs PAT); Track E (Play packaging — gated on
   Track C). Handoff §20 added (this build record). **Code: 10 files changed (5 new, 5 modified).** Push to
   repo B only (canonical); repo A untouched.
+- **2026-07-08 (GLM 5.2 — Track B Step 5 Edge Function + 4 remaining guards BUILT — Engineering Loop)** —
+  Owner authorized building Step 5 + all remaining tracks. Full Engineering Loop executed. **BUILT:** 6 new
+  files (`supabase/migrations/20260708120000_cap_vg1_copilot_permission.sql` — adds `copilot.use` permission
+  to catalog; `supabase/functions/copilot-ask/index.ts` — Deno Edge Function with JWT auth, permission check,
+  money-path blocklist, audit logging, offline-degrade; `scripts/guards/cap-vg1-perm-isolation.sql`;
+  `cap-vg1-rls-passthrough.sql`; `cap-vg1-money-immutability.sql`; `cap-vg1-no-bypass.sql`) + 3 patched
+  files (`cap-vg1-offline-degrade.sql` — updated for step 5 permission; `tsconfig.json` — excludes
+  `supabase/functions` from tsc; `package.json` — 4 new `guard:copilot:*` scripts). **Verification:** lint
+  exit 0, test 18/89/0, build exit 0 (5.92s). All 5 copilot guards PASS locally via docker exec. **Defend-
+  phase fixes:** (a) offline-degrade guard flagged step 5 permission as defect — updated to allow 0 or 1;
+  (b) money-immutability guard flagged pre-existing RPC grants — rescoped to copilot-migration-only.
+  **Still QUEUED:** `supabase functions deploy` + `supabase db push` (need `SUPABASE_DB_PASSWORD`); Track C
+  (hosting — need provider choice + anon key); Track D (branch protection — owner UI); Track E (Play —
+  gated on C). Handoff §21 added. **Code: 9 files changed (6 new, 3 modified).** Push to repo B only.
