@@ -820,7 +820,7 @@ If the owner wants to authorize the build halves to start in this terminal (or i
 
 ---
 
-### 19. Session 2026-07-08 (GLM 5.2 audit of minimax-m3's work — pending placeholders folded, stale repo-A URL caught) (tip of this §19 record: `pending`; will be folded to actual SHA in post-commit-and-push fold — per the established convention)
+### 19. Session 2026-07-08 (GLM 5.2 audit of minimax-m3's work — pending placeholders folded, stale repo-A URL caught) (tip of this §19 record: `40ebead` — the post-commit-and-push fold was deferred from the original session; GLM 5.2 audit folded the `pending` placeholder to the actual SHA)
 
 **Model switch:** The session switched from minimax-m3 (via ollama-launch) to GLM 5.2 (via Nvidia). The user asked: "continue whats wha left of, finish all unfinish, audit minimaxm3 work and continue." GLM 5.2 resumed the audit role defined in §15.
 
