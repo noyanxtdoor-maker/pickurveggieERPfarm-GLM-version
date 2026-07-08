@@ -513,13 +513,19 @@ handoff first and continues at the appropriate §6 "Immediate next step."
   this session is exactly this: record the authorization, queue the next steps, be honest about the
   environment gap, let the next session with the right tools execute.
 
-**Queued work for the next session that has Docker + supabase CLI + the cloud project credentials:**
+**Queued work for the next session (the env-blocker has narrowed since this §13 was written — see §17 for the corrected env picture):**
 
 1. Re-run the 164-guard battery against the freshly-pushed cloud schema, per the decision package §3
    risk note. Expect 164 PASS / 0 DEFECT (matches the local battery at HEAD d256b80). If anything
    regresses, reverse the `db push` via migration history and stop the lock here.
 2. `supabase db push` to cloud project `jabjyvdkadcbfocaerno`. Reversible via Supabase migration history;
    do it in a maintenance window. The remote schema is currently EMPTY; this is the deploy that fills it.
+   **Prerequisites narrowed (2026-07-08):** Docker CLI + supabase CLI 2.107.0 are installed; the
+   cloud project ref `jabjyvdkadcbfocaerno` is linked in `supabase/.temp/project-ref`. What's still
+   needed: (a) the Docker daemon running (`dockerDesktopLinuxEngine` pipe is not responding from
+   this terminal; owner starts Docker Desktop), (b) the cloud DB password delivered via the Track C
+   env-key channel (still TBD by owner — see §14). When both arrive, `supabase db push --linked` will
+   work. See handoff §17 for the full env-recheck record.
 3. Append the `db push` event to the append-only lock log in this handoff (new §14) and in
    `STATUS.md §4`, recording timestamp + migration files applied (8+) + the guard re-run result.
 4. Begin B2 implementation against `Phase_2_B2_Digital_Payments_Reconciliation_Spec.md` per the
@@ -611,11 +617,12 @@ modified, no guard added, no `supabase` command issued.
 | File | Line | Reference type | Audit verdict |
 |---|---|---|---|
 | `Phase_2_Branch_Protection_ClickPath.md` | 228 | F2-fix narrative (meta-narrative documenting the fix) | **Keep as-is.** It says "previously referenced the disregarded repo A; now all point at repo B" — that's a historical record of the fix, not a current-state claim. |
-| `Phase_2_Context_Reset_Handoff.md` | 236 | Local Docker container name `supabase_db_pickurveggieerp-glm` (renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `3bb49a7` and the §16 entry below) | **Keep as-is-with-update.** The container name is a local process identifier, not a repo URL. The §236 guard command was updated to match the new name in the same commit that renamed `supabase/config.toml` `project_id`. |
-| `Phase_2_Context_Reset_Handoff.md` | 484, 486 | §13 historical record ("BEFORE the 2026-07-08 boundary decision") | **Keep as-is with boundary context added in this turn.** The record describes what was true when it was written. |
-| `Phase_2_Context_Reset_Handoff.md` | 557 | §14 historical record of the F2 fix | **Keep as-is with boundary context added in this turn.** Same as above. |
-| `STATUS.md` | 7, 217 | Current-state claims | **Fixed in this turn.** Replaced "pushed to repo A and repo B" with "in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15." |
-| `STATUS.md` | 208 | §4 entry describing the F2 fix (historical) | **Fixed in this turn.** Replaced `pick-ur-veggie-farm` with "the disregarded repo A." |
+| `Phase_2_Context_Reset_Handoff.md` | 236 | Local Docker container name `supabase_db_pickurveggieerp-glm` (renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `841de03` and the §16 entry below) | **Keep as-is-with-update.** The container name is a local process identifier, not a repo URL. The §236 guard command was updated to match the new name in the same commit that renamed `supabase/config.toml` `project_id`. |
+| `Phase_2_Context_Reset_Handoff.md` | 483 | §13 historical record ("BEFORE the 2026-07-08 boundary decision") | **Keep as-is with boundary context added in this turn.** The record describes what was true when it was written. |
+| `Phase_2_Context_Reset_Handoff.md` | 564 | §14 historical record of the F2 fix | **Keep as-is with boundary context added in this turn.** Same as above. |
+| `STATUS.md` | 7 | Current-state claim (header) | **Fixed in this turn.** Replaced "pushed to repo A and repo B" with "in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15." |
+| `STATUS.md` | 210 | §4 entry describing the F2 fix (historical) | **Fixed in this turn.** Replaced `pick-ur-veggie-farm` with "the disregarded repo A." |
+| `STATUS.md` | 219 | §4 entry with the "current tip" claim | **Fixed in this turn.** The "current tip is `52e04ea`" claim was stale; folded to the actual tip (currently `841de03` on `origin`; previous tips: `0ec78ab` / `a88a9ef` documented in the entry's fold chain). |
 
 **The local `origin` remote was already repointed to repo B in the prior turn of this session** (per the owner's earlier "lets focus only on repo B" message). This §15 record documents that the repointing happened and binds the rule to the handoff's audit trail.
 
@@ -665,7 +672,7 @@ modified, no guard added, no `supabase` command issued.
 
   - `docs/28_Enterprise_Architecture_Audit/Phase_2_Context_Reset_Handoff.md` line 236 — guard command `supabase_db_pick-ur-veggie-farm` → `supabase_db_pickurveggieerp-glm` (the new container name).
   - `docs/28_Enterprise_Architecture_Audit/Stage_D_Phase_1_Context_Reset_Handoff.md` line 66 — same guard-command rename.
-  - `docs/28_Enterprise_Architecture_Audit/Phase_2_Context_Reset_Handoff.md` line 614 (§15 audit checklist table) — updated entry: the container-name row now says "renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `3bb49a7` and this §16 entry" and the verdict changed from "Keep as-is" to "Keep as-is-with-update" (the §236 guard command was updated to match the new name in the same commit).
+  - `docs/28_Enterprise_Architecture_Audit/Phase_2_Context_Reset_Handoff.md` line 620 (§15 audit checklist table) — updated entry: the container-name row now says "renamed 2026-07-08 from `supabase_db_pick-ur-veggie-farm` per the Option 1+2 boundary hardening — see commit `841de03` and this §16 entry" and the verdict changed from "Keep as-is" to "Keep as-is-with-update" (the §236 guard command was updated to match the new name in the same commit).
 
 **What did NOT change in the doc tree (intentionally kept):**
 
@@ -695,3 +702,55 @@ modified, no guard added, no `supabase` command issued.
   - Did NOT change the `package.json` `db:start` / `db:stop` / `db:status` scripts.
 
 **Session-end posture:** clean tree (the rename + doc updates + this §16 record will be committed in one commit). The new tip will be the commit made for this §16 record. Push to the canonical home (repo B) only. The §15 sticky-header convention is in effect: the STATUS.md `_Last updated` SHA will lag the actual tip by one commit (this is the convention; see §15 audit checklist item #2 for the auditor's git-log command).
+
+---
+
+### 17. Session 2026-07-08 (Track A env-recheck — the "git-only terminal" claim was wrong) — doc-side correction only (tip of this §17 record: pending; will be folded to actual SHA in post-commit-and-push fold)
+
+**Defect found:** handoff §13 (written in commit `3dd43bf` during the Track A record turn) and STATUS.md §4 line 189-191 both stated "this terminal is git-only" and "QUEUED for the next session that has Docker Desktop + the supabase CLI + the cloud project credentials." This was incorrect.
+
+**Reality (verified in this turn, 2026-07-08):**
+
+  - **Docker CLI:** installed at `C:\Program Files\Docker\Docker\resources\bin\docker`. ✓
+  - **Supabase CLI:** installed at `C:\Users\sherl\AppData\Roaming\npm\supabase`, version 2.107.0. ✓
+  - **Cloud project ref:** linked in `supabase/.temp/project-ref` → `jabjyvdkadcbfocaerno`. ✓
+  - **Node + npm + vitest + vite + tsc:** all available. Verified `npm run lint`, `npm run test`, `npm run build` all PASS earlier in this session (commits `841de03` and the verification in this same turn).
+  - **Docker daemon:** NOT running. `dockerDesktopLinuxEngine` named pipe is not responding. `supabase status` returns "failed to inspect container health" because it can't reach the daemon. ✗
+  - **Cloud DB password:** NOT in this terminal's env. `supabase db push --dry-run` returns "Failed to create login role: Connection terminated due to connection timeout. Connect to your database by setting the env var correctly: SUPABASE_DB_PASSWORD". ✗
+
+**Corrected env picture for Track A's `supabase db push` step:**
+
+The §12 prompt's second action item (`supabase db push` to `jabjyvdkadcbfocaerno`) requires TWO things this terminal doesn't have:
+
+  1. **Docker daemon running.** Owner starts Docker Desktop. The terminal can verify readiness with `docker ps` (returns a table when daemon is up) or `supabase status` (returns service URLs + container status when daemon is up + stack is started).
+  2. **Cloud DB password via a secure channel.** Per CLAUDE.md §0 ("never read, print, or commit secrets") and the decision package §7 honest gap ("no documented mechanism for the owner to send keys to the agent securely"), the cloud DB password is the OWNER's secret. The owner chooses the secure channel — that's the Track C env-key channel owner input (1Password / encrypted email / etc., still TBD per handoff §14). When the channel is chosen, the owner delivers the password; the terminal exports it as `SUPABASE_DB_PASSWORD` env var; `supabase db push --linked` runs.
+
+**What this turn actually did (scope discipline):**
+
+  - Re-verified the env with real tests (`docker ps`, `supabase status`, `supabase --version`, `supabase db push --dry-run`). Did NOT assume.
+  - Updated handoff §13's queued-work list to reflect the corrected narrower blocker.
+  - Updated STATUS.md §4 line 189-191 to remove the "this terminal is git-only" claim and replace it with the corrected "supabase CLI + Docker CLI installed; Docker daemon not running; cloud DB password not in env".
+  - Added this §17 record as the audit-trail entry for the correction.
+
+**What this turn did NOT do (scope discipline):**
+
+  - Did NOT start Docker Desktop. That's an owner action on the host (the terminal can't start a Windows service from a bash session; would need `net start com.docker.service` or `Start-Service` from PowerShell, and the owner has the desktop session, not the agent).
+  - Did NOT request the cloud DB password. The §12 Track A prompt does not authorize me to ask for it directly; the prompt template says the owner delivers it through their chosen channel. Per CLAUDE.md §0, the agent does not solicit secrets through chat.
+  - Did NOT run `supabase db push`. Even if the daemon were running, the password is missing. And even if the password were available, the B2 build (the second half of Track A) is a separate code-build step that needs the spec file + a build session, not a single command.
+  - Did NOT start B2 implementation. B2 is a code-build, not a deploy. The B2 spec (`Phase_2_B2_Digital_Payments_Reconciliation_Spec.md` §6) lays out a multi-day build sequence; the agent role is to record sign-off, not fake the build.
+  - Did NOT touch repo A. Boundary rule respected.
+  - Did NOT change the `project_id` in `supabase/config.toml` (the Option 1+2 rename in `841de03` is the only project_id change in this session, and it was already pushed to repo B).
+
+**What the owner needs to do to advance Track A's build half (concrete, no guessing):**
+
+  1. **Start Docker Desktop** on the Windows host. Once the daemon is up, the terminal can verify with `docker ps` and the supabase CLI can read container health.
+  2. **Choose the Track C env-key channel** (1Password shared vault / encrypted email / other). This is the same channel the owner would use to deliver the cloud DB password AND the `SUPABASE_SERVICE_ROLE_KEY` AND the `VITE_SUPABASE_ANON_KEY` (all owner secrets; all per the `.env.example` contract).
+  3. **Deliver the cloud DB password** through that channel. The terminal exports it as `SUPABASE_DB_PASSWORD` env var.
+  4. **Run the 9-step migration checklist** from handoff §16 (in order): `supabase stop` (cleanup if old container from pre-rename is still around — unlikely since daemon is down), `docker volume rm supabase_db_pick-ur-veggie-farm` (optional), `npm run db:start`, `npm run db:reset`, re-run guard battery, `supabase link --project-ref jabjyvdkadcbfocaerno` (verify link), `supabase db push --linked` (the actual deploy), append deploy event to handoff §18 (new section) + STATUS.md §4.
+  5. **Begin B2 implementation** in a NEW session that has the cloud schema confirmed live + a code-build environment. This is a multi-day build; not appropriate for the current turn or even the current terminal session.
+
+**Standing rule reaffirmed (the assistant-to-GLM-5.2 framing):**
+
+The role framing from §15 ("YOU ARE JUST AN ASSISTANT TO GLM5.2 WHILE WAITING FOR IT TO BE RESTORED") applies here. The doc-side record is the assistant's job: verify reality, record what was found, queue what comes next, stop. The build half of Track A is the env-capable session's job: run the actual `db push` + B2 build, log the deploy events, lock the financial-integrity controls. This terminal can do the first; it cannot do the second honestly.
+
+**Session-end posture:** clean tree (the §13 / STATUS.md correction + this §17 record will be committed in one commit). The new tip will be the commit made for this §17 record. Push to the canonical home (repo B) only. The §15 sticky-header convention is in effect.

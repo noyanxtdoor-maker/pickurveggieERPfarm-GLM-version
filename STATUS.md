@@ -186,9 +186,11 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   §12 prompt's first action item ("push the local-only commits") is a no-op — local HEAD
   `d256b80` is in sync with origin (ahead 0, behind 0) and the same SHA is on repo B
   per the 2026-07-08 push task. **The §12 prompt's remaining action items (`supabase db push`
-  + B2 implementation start) are QUEUED for the next session that has Docker Desktop + the
-  supabase CLI + the cloud project credentials** — this terminal is git-only and cannot run
-  them. No money-path code touched, no migration modified, no guard added. Track A's
+  + B2 implementation start) are QUEUED for the next session that has Docker daemon running +
+  the cloud project credentials delivered via the Track C env-key channel** — this terminal
+  has the supabase CLI + Docker CLI installed and the cloud project ref linked, but the
+  Docker daemon is not running and the cloud DB password is not in this terminal's env
+  (and per CLAUDE.md §0 should not be — owner delivers it through a secure channel).
   "lock and push" boxes are now ticked; the lock itself is the `db push` + the B2 build
   (queued). **No feature row in §2 changed** — M2E / M2C / M4A / M5A are still "Done (pushed)
   — pre-lock" pending the queued deploy; B2 is still "Not started (Blocked)" because the
@@ -254,3 +256,19 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   is in effect: the `_Last updated` SHA in this STATUS header will lag the actual tip by one commit (this is
   the convention; see handoff §15 audit checklist item #2). The 9-step migration checklist for the next
   env-capable session (env-blocked in this terminal — no Docker) is in handoff §16.
+- **2026-07-08 (Track A env-recheck — the "git-only terminal" claim was wrong, corrected in handoff §13/§17 + this STATUS row)** —
+  Defect found: handoff §13 and STATUS §4 line 189-191 both said "this terminal is git-only" and "QUEUED for the next
+  session that has Docker Desktop + the supabase CLI + the cloud project credentials." This was wrong. Re-verified in this
+  turn: Docker CLI is installed at `C:\Program Files\Docker\Docker\resources\bin\docker` (verified with `command -v docker`),
+  supabase CLI 2.107.0 is installed at `C:\Users\sherl\AppData\Roaming\npm\supabase` (verified with `supabase --version`),
+  `supabase/.temp/project-ref`, and node/npm/vitest/vite/tsc are all available (the verification suite for the
+  Option 1+2 commit `841de03` all passed earlier in this session). **What's still missing (the corrected narrower
+  blocker):** (a) Docker daemon not running — `dockerDesktopLinuxEngine` named pipe is not responding; (b) cloud DB
+  password not in `SUPABASE_DB_PASSWORD` env var — and per CLAUDE.md §0 the agent does not solicit secrets through
+  chat; the owner delivers via the Track C env-key channel (still TBD per handoff §14). Updated handoff §13's
+  queued-work list to reflect the narrower blocker. Handoff §17 added (the audit-trail entry for the correction).
+  **Code: 0 lines changed.** Doc-only correction. Push to repo B only (canonical); repo A untouched (boundary rule).
+  The owner-action list to advance Track A's build half is in handoff §17: (1) start Docker Desktop; (2) choose the
+  Track C env-key channel; (3) deliver the cloud DB password through that channel; (4) run the 9-step migration
+  checklist from §16; (5) begin B2 implementation in a new session after the schema is live. The build half of
+  Track A is still QUEUED, not faked.
