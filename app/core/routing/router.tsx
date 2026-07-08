@@ -25,6 +25,7 @@ const PayrollScreen = lazy(() => import('../../features/payroll/PayrollScreen'))
 const SchedulesScreen = lazy(() => import('../../features/scheduling/SchedulesScreen'));
 const ProjectsScreen = lazy(() => import('../../features/projects/ProjectsScreen'));
 const SettingsScreen = lazy(() => import('../../features/settings/SettingsScreen'));
+const CopilotPanel = lazy(() => import('../../features/copilot/CopilotPanel'));
 const OperationsLayout = lazy(() => import('../../features/operations/OperationsLayout'));
 const CustomersScreen = lazy(() => import('../../features/customers/CustomersScreen'));
 const CropsLayout = lazy(() => import('../../features/crops/CropsLayout'));
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
       {path: 'projects', element: <Navigate to="/operations/projects" replace />},
       {path: 'crops/*', element: <Navigate to="/operations/crops" replace />},
       {path: 'reports', element: <Placeholder title="Reports" />},
+      {path: 'copilot', element: <CopilotPanel />},
       {path: 'settings', element: <SettingsScreen />},
     ],
   },

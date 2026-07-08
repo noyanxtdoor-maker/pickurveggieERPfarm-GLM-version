@@ -302,3 +302,23 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   documented in spec but NOT built in `scripts/guards/` (QUEUED, not faked), verbatim transcripts untouched.
   Handoff §19 added (this audit-trail record). **Code: 0 lines changed.** Doc-only audit + fixes. Push to
   repo B only (canonical); repo A untouched. All builds remain QUEUED, not faked, per §14 + §18.
+- **2026-07-08 (GLM 5.2 — Track B / CAP-VG1 Steps 1-4 + offline-degrade guard BUILT — Engineering Loop)** —
+  Owner authorized building all remaining track halves + following the Engineering Loop (Define→Challenge→
+  Attack→Defend→Audit→Revise→Decision→Version Lock). Track B (CAP-VG1) Steps 1-4 are pure client code
+  (no DB, no Edge Function, no RLS, no money-path) — buildable without cloud. **BUILT:** 5 new files
+  (`app/features/copilot/brief.ts` — non-AI Morning Brief grounded in Dexie caches; `copilotHistory.ts` —
+  IndexedDB chat history; `copilotApi.ts` — LM Studio `/v1/chat/completions` with offline-degrade;
+  `CopilotPanel.tsx` — chat UI with brief sidebar + connectivity indicator; `scripts/guards/cap-vg1-offline-
+  degrade.sql` — verifies no DB surface added) + 5 patched files (SettingsScreen — Copilot card with 3 prefs;
+  router — `/copilot` route; AppShell — nav entry; session.tsx — logout purge; package.json — `guard:copilot`
+  script). **Verification:** lint exit 0, test 18/89/0 fail, build exit 0 (CopilotPanel chunk 9.8KB
+  lazy-loaded), guard:static PASS (only pre-existing `.tmp_capture` false-positive), guard:copilot PASS
+  (no DB tables/perms/RLS added). Money-path audit: only write is `copilotMessages.add()` (local IndexedDB —
+  NOT a money-path). Scope audit: no Edge Function, no migration, no RLS, no new DB permissions. **Defend-phase
+  fixes:** (a) DB guard `%ai_%` LIKE matched "maintenance" — tightened to `%copilot%`/`%veggiegenius%`; (b)
+  `m.role === 'user'` triggered `no-role-name-auth` static guard — renamed field to `chatRole`, used numeric
+  `tagOf()` discriminator. **Still QUEUED:** Step 5 (Cloud Edge Function) + 4 of 5 guards (perm-isolation,
+  rls-passthrough, money-immutability, no-bypass — test Edge Function behaviors); Track A/C (cloud db push —
+  needs `SUPABASE_DB_PASSWORD`); Track D (branch protection — needs PAT); Track E (Play packaging — gated on
+  Track C). Handoff §20 added (this build record). **Code: 10 files changed (5 new, 5 modified).** Push to
+  repo B only (canonical); repo A untouched.

@@ -43,6 +43,7 @@ const CORE_MODULES = [
   {to: '/customers', label: 'Customers & Credit', icon: Contact},
   {to: '/payroll', label: 'Salaries & Payroll', icon: Users2},
   {to: '/operations', label: 'Operations', icon: ClipboardList},
+  {to: '/copilot', label: 'VeggieGenius', icon: Sparkles},
   {to: '/reports', label: 'Reports', icon: BarChart3},
   {to: '/settings', label: 'Settings Hub', icon: Settings},
 ] as const;

@@ -5,12 +5,15 @@
 // multi-tenant server world those are governed server operations, not a client button. No migration, no new
 // permission, no RLS surface: a device configuring its own look and labels.
 import {useState} from 'react';
-import {Palette, Check, Store, Cloud, Download, LogOut, MonitorCog} from 'lucide-react';
+import {Palette, Check, Store, Cloud, Download, LogOut, MonitorCog, Sparkles} from 'lucide-react';
 import {useSession} from '../../core/auth/session';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {useToast} from '../../components/feedback';
 import {THEMES, useTheme, usePref, type ThemeId} from '../../core/prefs/prefs';
 import {exportLocalData} from './export';
+
+const LM_DEFAULT_URL = 'http://localhost:1234';
+const LM_DEFAULT_MODEL = 'google/gemma-4-e4b';
 
 const THEME_META: Record<ThemeId, {name: string; desc: string; swatch: string}> = {
   light: {name: 'Fresh Wood', desc: 'Default deep forest-green daylight palette', swatch: '#003e1c'},
@@ -26,6 +29,9 @@ export default function SettingsScreen() {
   const [farmName, setFarmName] = usePref('farm_display_name');
   const [terminalId, setTerminalId] = usePref('terminal_id', 'Terminal A — Main Gate');
   const [exporting, setExporting] = useState(false);
+  const [copilotEnabled, setCopilotEnabled] = usePref('copilot_enabled', '1');
+  const [copilotLmUrl, setCopilotLmUrl] = usePref('copilot_lm_url', LM_DEFAULT_URL);
+  const [copilotModel, setCopilotModel] = usePref('copilot_model', LM_DEFAULT_MODEL);
 
   async function doExport() {
     setExporting(true);
@@ -101,6 +107,48 @@ export default function SettingsScreen() {
               </label>
             </div>
             <p className="mt-3 text-[10px] text-farm-muted">Changes save as you type. Leave the display name blank to fall back to the company name.</p>
+          </Card>
+
+          {/* Copilot (CAP-VG1) — LM Studio connection settings */}
+          <Card>
+            <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-farm-green"><Sparkles className="h-5 w-5" aria-hidden /> VeggieGenius Copilot</h3>
+            <p className="mb-4 text-xs text-farm-muted">
+              Connect to a local LM Studio model for AI-assisted farm operations. The Copilot is advisory only —
+              it reads your data to answer questions but never writes to the database. Disable it here and the
+              full ERP keeps working unchanged.
+            </p>
+            <div className="space-y-3">
+              <label className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  checked={copilotEnabled === '1'}
+                  onChange={(e) => { setCopilotEnabled(e.target.checked ? '1' : '0'); notify(e.target.checked ? 'Copilot enabled' : 'Copilot disabled — ERP still fully functional'); }}
+                  className="h-4 w-4 rounded border-farm-accent-soft"
+                />
+                <span className="text-xs font-bold text-farm-ink">Enable Copilot</span>
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">LM Studio base URL</span>
+                <input
+                  value={copilotLmUrl}
+                  onChange={(e) => setCopilotLmUrl(e.target.value)}
+                  onBlur={() => notify('Saved')}
+                  placeholder={LM_DEFAULT_URL}
+                  className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm"
+                />
+              </label>
+              <label className="block">
+                <span className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Model ID</span>
+                <input
+                  value={copilotModel}
+                  onChange={(e) => setCopilotModel(e.target.value)}
+                  onBlur={() => notify('Saved')}
+                  placeholder={LM_DEFAULT_MODEL}
+                  className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm"
+                />
+              </label>
+            </div>
+            <p className="mt-3 text-[10px] text-farm-muted">Default model is the Gemma 4 E4B confirmed loaded in this terminal's LM Studio.</p>
           </Card>
 
           {/* Data & backup — backlog */}

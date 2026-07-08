@@ -5,6 +5,7 @@ import {createContext, useContext, useEffect, useMemo, useState, type ReactNode}
 import type {Session, User} from '@supabase/supabase-js';
 import {supabase, isSupabaseConfigured} from '../supabase/client';
 import {offlineDB, purgeCache} from '../offline/db';
+import {purgeCopilotHistory} from '../../features/copilot/copilotHistory';
 import {DEMO, MOCK_MODE} from '../mock/mock';
 
 // A minimal stand-in session for mock/offline-dev mode (no cloud auth).
@@ -83,6 +84,7 @@ export function SessionProvider({children}: {children: ReactNode}) {
         }
         await supabase.auth.signOut();
         await purgeCache(); // S1 — purge scoped cache on logout.
+        await purgeCopilotHistory(); // CAP-VG1: clear local chat history on logout (client-only, not an audit surface).
       },
     }),
     [status, session],
