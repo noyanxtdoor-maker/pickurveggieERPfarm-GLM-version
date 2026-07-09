@@ -6,3 +6,14 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Code-knowledge tool output (generated, not source)
+.codegraph/
+graphify-out/
+
+# Browser-probe scratch artifacts (session-local, not source)
+.tmp_capture/
+.supabase_db_password
+*.supabase_db_password
+
+.vercel
