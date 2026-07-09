@@ -41,6 +41,9 @@ jobs:
   secrets:
     name: Secret scan
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout (full history)
         uses: actions/checkout@v4
@@ -123,3 +126,4 @@ jobs:
       - name: Stop local Supabase
         if: always()
         run: npx supabase stop
+
