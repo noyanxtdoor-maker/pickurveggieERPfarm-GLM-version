@@ -1,4 +1,13 @@
-# STATUS.md — PickUrVeggie ERP V3 (source of truth for review)
+﻿# STATUS.md — PickUrVeggie ERP V3 (source of truth for review)
+
+> **⚠️ 2026-07-09 OWNER CORRECTION:** The "repo A disregarded / repo B canonical" language
+> throughout this document overstates the owner's actual 2026-07-08 instruction, which was:
+> *"GLM5.2 and minimax-m3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."*
+> That is a **work-boundary rule** (who touches which repo), not a permanence ranking. Repo A
+> is not "disregarded" — it is simply out of scope for GLM/minimax-m3. As of 2026-07-09, the
+> owner confirms **current active focus is repo B**, and GLM/minimax-m3 continue working there
+> exclusively per the original boundary. Read all "disregarded"/"canonical" language below as
+> historical narrative, not a standing verdict on repo A's importance.
 
 **Owner of this file:** the coding agent (Claude). **Consumer:** a separate reviewer model (GLM) that decides what
 to review based on what this file marks "Done." **Rule: never round up.** If a flow was not tested end-to-end by

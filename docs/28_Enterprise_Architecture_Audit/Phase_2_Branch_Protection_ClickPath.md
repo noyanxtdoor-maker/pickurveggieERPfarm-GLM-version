@@ -1,4 +1,13 @@
-# Branch Protection — Owner Click-Path (Operational Apply Guide)
+﻿# Branch Protection — Owner Click-Path (Operational Apply Guide)
+
+> **⚠️ 2026-07-09 OWNER CORRECTION:** The "repo A disregarded / repo B canonical" language
+> throughout this document overstates the owner's actual 2026-07-08 instruction, which was:
+> *"GLM5.2 and minimax-m3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."*
+> That is a **work-boundary rule** (who touches which repo), not a permanence ranking. Repo A
+> is not "disregarded" — it is simply out of scope for GLM/minimax-m3. As of 2026-07-09, the
+> owner confirms **current active focus is repo B**, and GLM/minimax-m3 continue working there
+> exclusively per the original boundary. Read all "disregarded"/"canonical" language below as
+> historical narrative, not a standing verdict on repo A's importance.
 
 **Type:** Operational how-to (companion to `Stage_D_Branch_Protection_Precondition.md` which is the
 *what* and `Phase_2_Owner_Decision_Package.md §4` which is the *when*). **Date:** 2026-07-08.

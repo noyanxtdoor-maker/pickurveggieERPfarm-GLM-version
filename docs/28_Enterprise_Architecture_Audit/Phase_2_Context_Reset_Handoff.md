@@ -1,4 +1,13 @@
-# Phase 2 — Context Reset Handoff (STANDING continuity artifact — keep updated every session)
+﻿# Phase 2 — Context Reset Handoff (STANDING continuity artifact — keep updated every session)
+
+> **⚠️ 2026-07-09 OWNER CORRECTION:** The "repo A disregarded / repo B canonical" language
+> throughout this document overstates the owner's actual 2026-07-08 instruction, which was:
+> *"GLM5.2 and minimax-m3 only focus on repo B, opus4.8 only at repo A, DO NOT TOUCH REPO A."*
+> That is a **work-boundary rule** (who touches which repo), not a permanence ranking. Repo A
+> is not "disregarded" — it is simply out of scope for GLM/minimax-m3. As of 2026-07-09, the
+> owner confirms **current active focus is repo B**, and GLM/minimax-m3 continue working there
+> exclusively per the original boundary. Read all "disregarded"/"canonical" language below as
+> historical narrative, not a standing verdict on repo A's importance.
 
 **Type:** Continuity artifact (not a summary) · **Updated:** 2026-07-04 · **Branch:** `feature/phase-0-foundation`
 **Owner standing instruction (2026-07-02):** *always update this handoff for the next AI session before usage runs out.*
