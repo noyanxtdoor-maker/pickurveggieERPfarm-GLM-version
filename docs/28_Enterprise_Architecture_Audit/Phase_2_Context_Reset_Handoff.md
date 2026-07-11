@@ -1066,7 +1066,7 @@ Track E (Play packaging):
 
 ---
 
-### 23. Session 2026-07-11 (Docker resumed — guard 179/0 re-verified, P1A+P1B cloud 25/25, auth trigger cloud-verified) (tip of this §23 record: pending — will be folded after commit+push)
+### 23. Session 2026-07-11 (Docker resumed — guard 179/0 re-verified, P1A+P1B cloud 25/25, auth trigger cloud-verified) (tip of this §23 record: `4ed50ff` — repo B `feature/phase-0-foundation`, pushed 2026-07-11)
 
 Owner message: "docker is up continue."
 
