@@ -29,6 +29,12 @@ export default defineConfig(() => {
     test: {
       include: ['tests/**/*.test.{ts,tsx}'],
       environment: 'node', // default; component tests opt into jsdom via a per-file `// @vitest-environment jsdom`.
+      // Unit tests must always exercise the mock adapter, even if the developer has
+      // a real .env with cloud credentials set (Repo A 9a79545 safety fix).
+      // Integration tests against live cloud are a separate workflow (vite dev / vitest --mode integration).
+      env: {
+        VITE_USE_MOCK: 'true',
+      },
     },
     server: {
       // Tooling (preview harness) assigns a port via PORT; `npm run dev`'s explicit --port=3000 still wins.

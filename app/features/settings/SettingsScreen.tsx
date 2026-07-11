@@ -5,15 +5,12 @@
 // multi-tenant server world those are governed server operations, not a client button. No migration, no new
 // permission, no RLS surface: a device configuring its own look and labels.
 import {useState} from 'react';
-import {Palette, Check, Store, Cloud, Download, LogOut, MonitorCog, Sparkles} from 'lucide-react';
+import {Palette, Check, Store, Cloud, Download, KeyRound, LogOut, MonitorCog, Sparkles} from 'lucide-react';
 import {useSession} from '../../core/auth/session';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {useToast} from '../../components/feedback';
 import {THEMES, useTheme, usePref, type ThemeId} from '../../core/prefs/prefs';
 import {exportLocalData} from './export';
-
-const LM_DEFAULT_URL = 'http://localhost:1234';
-const LM_DEFAULT_MODEL = 'google/gemma-4-e4b';
 
 const THEME_META: Record<ThemeId, {name: string; desc: string; swatch: string}> = {
   light: {name: 'Fresh Wood', desc: 'Default deep forest-green daylight palette', swatch: '#003e1c'},
@@ -22,6 +19,99 @@ const THEME_META: Record<ThemeId, {name: string; desc: string; swatch: string}> 
   green: {name: 'Green Pastures', desc: 'Bright pasture green, minty daylight', swatch: '#1e7a3f'},
 };
 
+// P1 security card: change password guarded by an emailed one-time code (ODR-003 re-auth for sensitive
+// actions). Flow: "Send code" → supabase emails a 6-digit OTP → user enters code + new password →
+// updateUser carries the OTP as its nonce. Google-only users are told to manage the password at Google.
+function SecurityCard() {
+  const {user, requestPasswordOtp, updatePasswordWithOtp} = useSession();
+  const [step, setStep] = useState<'idle' | 'otp'>('idle');
+  const [otp, setOtp] = useState('');
+  const [pw, setPw] = useState('');
+  const [pw2, setPw2] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const isGoogleOnly = (user?.app_metadata?.providers as string[] | undefined)?.every((p) => p === 'google') ?? false;
+
+  async function sendCode() {
+    setBusy(true); setErr(null); setMsg(null);
+    const r = await requestPasswordOtp();
+    if (r.error) setErr(r.error);
+    else {setStep('otp'); setMsg(`We emailed a one-time code to ${user?.email ?? 'your address'}. Enter it below with your new password.`);}
+    setBusy(false);
+  }
+  async function save() {
+    if (pw.length < 12) return setErr('New password needs at least 12 characters — a short sentence works well.');
+    if (pw !== pw2) return setErr('Passwords do not match.');
+    setBusy(true); setErr(null);
+    const r = await updatePasswordWithOtp(pw, otp.trim());
+    if (r.error) setErr(r.error);
+    else {setStep('idle'); setOtp(''); setPw(''); setPw2(''); setMsg('Password changed. Use it from your next sign-in.');}
+    setBusy(false);
+  }
+
+  return (
+    <Card>
+      <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-farm-green"><KeyRound className="h-5 w-5" aria-hidden /> Security — change password</h3>
+      {isGoogleOnly ? (
+        <p className="text-xs text-farm-muted">You sign in with Google, so there is no app password here — manage your password in your Google account.</p>
+      ) : (
+        <>
+          <p className="mb-3 text-xs text-farm-muted">For your protection, changing the password needs a one-time code we email to <strong className="font-mono text-farm-ink">{user?.email ?? 'you'}</strong>.</p>
+          {msg ? <p className="mb-2 rounded-lg bg-farm-accent-soft px-3 py-2 text-xs font-semibold text-farm-green" role="status">{msg}</p> : null}
+          {err ? <p className="mb-2 text-xs font-semibold text-red-700" role="alert">{err}</p> : null}
+          {step === 'idle' ? (
+            <Button variant="secondary" onClick={() => void sendCode()} disabled={busy}>{busy ? 'Sending…' : 'Email me a one-time code'}</Button>
+          ) : (
+            <div className="space-y-2.5">
+              <input value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))} inputMode="numeric" placeholder="6-digit code from the email" aria-label="One-time code" className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 font-mono text-sm tracking-widest" />
+              <input value={pw} onChange={(e) => setPw(e.target.value)} type="password" autoComplete="new-password" placeholder="New password (12+ characters)" aria-label="New password" className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm" />
+              <input value={pw2} onChange={(e) => setPw2(e.target.value)} type="password" autoComplete="new-password" placeholder="Repeat new password" aria-label="Repeat new password" className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm" />
+              <div className="flex gap-2">
+                <Button variant="secondary" onClick={() => {setStep('idle'); setErr(null); setMsg(null);}} disabled={busy}>Cancel</Button>
+                <Button className="flex-1" onClick={() => void save()} disabled={busy || otp.length < 6 || !pw}>{busy ? 'Saving…' : 'Change password'}</Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </Card>
+  );
+}
+
+// CAP-VG1 step 1 — the Copilot's LM Studio connection (D2 model choice is deliberately a preference,
+// spec §7). Client state only; turning it off leaves the whole ERP untouched (spec §1 failure mode).
+function CopilotCard() {
+  const {notify} = useToast();
+  const [enabled, setEnabled] = usePref('copilot_enabled', '1');
+  const [lmUrl, setLmUrl] = usePref('copilot_lm_url', 'http://localhost:1234');
+  const [model, setModel] = usePref('copilot_model', 'owner-default');
+  return (
+    <Card>
+      <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-farm-green"><Sparkles className="h-5 w-5" aria-hidden /> VeggieGenius Copilot</h3>
+      <p className="mb-3 text-xs text-farm-muted">
+        Connects the Copilot to a local LM Studio model on this device. Advisory only — it reads your data to
+        answer questions and never writes anything. Switch it off and the ERP works exactly the same.
+      </p>
+      <div className="space-y-3 text-sm">
+        <label className="flex min-h-10 cursor-pointer items-center gap-2 font-bold text-farm-ink">
+          <input type="checkbox" checked={enabled === '1'} className="h-4 w-4 accent-farm-green"
+            onChange={(e) => {setEnabled(e.target.checked ? '1' : '0'); notify(e.target.checked ? 'Copilot enabled' : 'Copilot off — ERP unaffected');}} />
+          Enable Copilot
+        </label>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="cp-url">LM Studio server URL</label>
+          <input id="cp-url" value={lmUrl} onChange={(e) => setLmUrl(e.target.value)} placeholder="http://localhost:1234" className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 font-mono text-xs" />
+        </div>
+        <div>
+          <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="cp-model">Model id <span className="normal-case text-farm-muted/70">(as shown in LM Studio)</span></label>
+          <input id="cp-model" value={model} onChange={(e) => setModel(e.target.value)} placeholder="e.g. google/gemma-3-4b" className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 font-mono text-xs" />
+        </div>
+      </div>
+    </Card>
+  );
+}
+
 export default function SettingsScreen() {
   const {user, signOut} = useSession();
   const {notify} = useToast();
@@ -29,9 +119,6 @@ export default function SettingsScreen() {
   const [farmName, setFarmName] = usePref('farm_display_name');
   const [terminalId, setTerminalId] = usePref('terminal_id', 'Terminal A — Main Gate');
   const [exporting, setExporting] = useState(false);
-  const [copilotEnabled, setCopilotEnabled] = usePref('copilot_enabled', '1');
-  const [copilotLmUrl, setCopilotLmUrl] = usePref('copilot_lm_url', LM_DEFAULT_URL);
-  const [copilotModel, setCopilotModel] = usePref('copilot_model', LM_DEFAULT_MODEL);
 
   async function doExport() {
     setExporting(true);
@@ -109,48 +196,6 @@ export default function SettingsScreen() {
             <p className="mt-3 text-[10px] text-farm-muted">Changes save as you type. Leave the display name blank to fall back to the company name.</p>
           </Card>
 
-          {/* Copilot (CAP-VG1) — LM Studio connection settings */}
-          <Card>
-            <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-farm-green"><Sparkles className="h-5 w-5" aria-hidden /> VeggieGenius Copilot</h3>
-            <p className="mb-4 text-xs text-farm-muted">
-              Connect to a local LM Studio model for AI-assisted farm operations. The Copilot is advisory only —
-              it reads your data to answer questions but never writes to the database. Disable it here and the
-              full ERP keeps working unchanged.
-            </p>
-            <div className="space-y-3">
-              <label className="flex items-center gap-3">
-                <input
-                  type="checkbox"
-                  checked={copilotEnabled === '1'}
-                  onChange={(e) => { setCopilotEnabled(e.target.checked ? '1' : '0'); notify(e.target.checked ? 'Copilot enabled' : 'Copilot disabled — ERP still fully functional'); }}
-                  className="h-4 w-4 rounded border-farm-accent-soft"
-                />
-                <span className="text-xs font-bold text-farm-ink">Enable Copilot</span>
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">LM Studio base URL</span>
-                <input
-                  value={copilotLmUrl}
-                  onChange={(e) => setCopilotLmUrl(e.target.value)}
-                  onBlur={() => notify('Saved')}
-                  placeholder={LM_DEFAULT_URL}
-                  className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm"
-                />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Model ID</span>
-                <input
-                  value={copilotModel}
-                  onChange={(e) => setCopilotModel(e.target.value)}
-                  onBlur={() => notify('Saved')}
-                  placeholder={LM_DEFAULT_MODEL}
-                  className="min-h-11 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm"
-                />
-              </label>
-            </div>
-            <p className="mt-3 text-[10px] text-farm-muted">Default model is the Gemma 4 E4B confirmed loaded in this terminal's LM Studio.</p>
-          </Card>
-
           {/* Data & backup — backlog */}
           <Card>
             <h3 className="mb-1 flex items-center gap-2 text-base font-bold text-farm-green"><Cloud className="h-5 w-5" aria-hidden /> Data &amp; Backup</h3>
@@ -160,6 +205,13 @@ export default function SettingsScreen() {
             </p>
             <Button variant="secondary" onClick={() => void doExport()} disabled={exporting}><Download size={16} aria-hidden /> {exporting ? 'Exporting…' : 'Export my data (JSON)'}</Button>
           </Card>
+
+          {/* Security — OTP-guarded password change (P1, ODR-003 sensitive-action re-auth).
+              Google-login users have no app password; they change it at their Google account. */}
+          <SecurityCard />
+
+          {/* VeggieGenius Copilot (CAP-VG1 step 1) — local LM Studio connection; pure client prefs, no DB. */}
+          <CopilotCard />
 
           {/* Session */}
           <Card>

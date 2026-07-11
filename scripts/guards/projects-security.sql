@@ -3,7 +3,8 @@
 -- membership, task rows are scoped through their parent project (EXISTS + is_branch_member), and writes are
 -- audited. Non-financial (no GL). Self-contained BEGIN/ROLLBACK; any DEFECT raises under ON_ERROR_STOP.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres) ──
 insert into auth.users (instance_id, id, aud, role, email) values

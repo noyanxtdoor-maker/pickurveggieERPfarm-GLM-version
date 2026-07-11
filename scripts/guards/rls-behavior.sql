@@ -5,7 +5,8 @@
 -- Self-contained: sets up its own fixtures inside one transaction and ROLLBACKs — leaves no data, no drift.
 -- Any DEFECT raises an exception; with `-v ON_ERROR_STOP=1` that fails the job. Clean run prints PASS lines.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (as postgres superuser; bypasses RLS) ───────────────────────────
 insert into auth.users (instance_id, id, aud, role, email) values

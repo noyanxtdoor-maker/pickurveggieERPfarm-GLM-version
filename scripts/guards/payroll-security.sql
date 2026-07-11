@@ -6,7 +6,8 @@
 -- accounting statements pick up wages (OpEx) + employee advances (asset) while the balance sheet still ties out.
 -- Runs as authenticated owners/workers with simulated JWT. Self-contained BEGIN/ROLLBACK; any DEFECT raises.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres) ──
 insert into auth.users (instance_id, id, aud, role, email) values

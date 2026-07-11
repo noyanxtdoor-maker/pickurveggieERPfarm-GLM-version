@@ -6,7 +6,8 @@
 -- sum(credit) on the trial balance, and Assets = Liabilities + Equity on the balance sheet. Runs as authenticated
 -- owners/workers with simulated JWT. Self-contained BEGIN/ROLLBACK; any DEFECT raises under ON_ERROR_STOP.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres) ──
 insert into auth.users (instance_id, id, aud, role, email) values

@@ -117,6 +117,9 @@ jobs:
       - name: Customers security tests (tenant isolation · customer.manage/read gates · non-money attribution · AR standing)
         run: npm run guard:customers
 
+      - name: Auth lifecycle security tests (P1A self-signup trigger · P1B requested-role queue · account recovery)
+        run: npm run guard:auth
+
       - name: Schema-drift guard
         run: npm run guard:drift
 

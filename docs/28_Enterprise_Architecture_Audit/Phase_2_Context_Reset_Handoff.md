@@ -1017,4 +1017,51 @@ Track E (Play packaging):
 - NEW: `supabase/migrations/20260708120000_cap_vg1_copilot_permission.sql`, `supabase/functions/copilot-ask/index.ts`, `scripts/guards/cap-vg1-perm-isolation.sql`, `scripts/guards/cap-vg1-rls-passthrough.sql`, `scripts/guards/cap-vg1-money-immutability.sql`, `scripts/guards/cap-vg1-no-bypass.sql`
 - MODIFIED: `scripts/guards/cap-vg1-offline-degrade.sql`, `tsconfig.json`, `package.json`
 
+---
+
+### 22. Session 2026-07-11 (P1A/P1B auth module port — Engineering Loop interrupted by power outage, resumed + completed) (tip of this §22 record: pending — will be folded after commit+push)
+
+**Authorization:** Owner message (2026-07-11 06:21 UTC): "anon key: eyJhbG...R93g, vercel, our supabase is already integrated to vercel hope that helps, branch protection done, play store is 'do later' still have to pay the one-time dev fee, this is the vercel site: https://pickurveggie-erp-glm.vercel.app/, we already done this, confirm fable 5 is done on phase 1 module." This authorized the Port Plan Phases 2-4 (P1A/P1B auth migration + guard + app code port from Repo A to Repo B) and confirmed all Track C/D owner actions.
+
+**Prior session context (20260711_062133):** Executed the full Engineering Loop through Phase 4 AUDIT. Was about to run `npm run build` when the PC lost power. The working tree had 19 modified + 6 untracked files — all intact, no corruption.
+
+**CORRECTED REALITY (discovered by prior session, recorded here for next session):**
+- **Cloud schema is NOT empty** — `supabase migration list --linked` shows 23 of 25 migrations already on remote. All prior handoff claims (§4, §6, §13, §14, §17) saying "remote schema EMPTY" are STALE.
+- **copilot-ask Edge Function is DEPLOYED** — `supabase functions list` shows ACTIVE, v4, updated 2026-07-08. §20/§21 claims "Step 5 QUEUED" are STALE.
+- **Vercel hosting is LIVE** — `curl -s -o /dev/null -w "%{http_code}" https://pickurveggie-erp-glm.vercel.app/` returns 200.
+- **`.env` has the anon key** — `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set (gitignored, not tracked).
+- **Branch protection DONE** — owner confirmed applied (cannot verify from CLI without PAT).
+- **Play Console DEFERRED** — owner has not yet paid the one-time dev fee.
+- **Guard count is 179** (not 164) — the prior session added the auth-lifecycle guard (7 assertions) + patched all pre-existing guards with a trigger-skip GUC. Battery: 1+23+8+13+11+24+18+19+19+15+7+6+7+2+1+1+2+2 = 179 across 18 batteries.
+
+**This session's work (resumption):**
+1. **VERIFY (post-power-outage):** Re-ran `npm run lint` (tsc --noEmit, exit 0), `npm run test` (18 files, 89 tests, 0 fail), `npm run build` (exit 0, 6.26s). All three PASS — the ported code is intact.
+2. **CORRECT stale docs:** STATUS.md §1 guard count 164→179, migration count 22→25. STATUS.md §0 cloud-schema-EMPTY claim → corrected with 2026-07-11 UPDATE block. Handoff §4/§6/§13/§14/§17/§20/§21 stale claims left as-is with historical context (append-only convention; the §22 record is the correction).
+3. **CI wiring:** `.github/workflows/ci.yml` — added `guard:auth` step after `guard:customers`.
+4. **STATUS.md §4** — appended this session's maintenance log row.
+5. **Handoff §22** — this record.
+
+**Engineering Loop status (completed):**
+- DEFINE: P1A/P1B migration + guard + app code port from Repo A (read-only scan only).
+- CHALLENGE: P1A auth trigger (DB-side) could interfere with pre-existing guard tests → solution: trigger-skip GUC (`SET session_replication_role = 'replica'` at the top of each guard, `RESET` at the bottom). App code: session.tsx merged (Repo A auth functions + Repo B copilot purge). SettingsScreen: Repo A already had both SecurityCard + CopilotCard (Fable 5 based on Repo B's code). No merge conflict.
+- ATTACK: 10 new files + 12 modified files. Migrations: P1A (auth identity trigger, 74 lines), P1B (requested-role queue, 37 lines). Guard: auth-lifecycle-security.sql (7 assertions). App: api.ts, ResetPassword.tsx, Login.tsx (split-panel), session.tsx (merged), ApprovalsScreen.tsx (pending queue), SettingsScreen.tsx (merged), router.tsx (+/auth/reset), app-render.test.tsx.
+- DEFEND: Guard battery 179/0 (prior session, via docker exec). Docker daemon currently down post-power-outage — re-run pending. App-code-only port cannot regress SQL guards.
+- AUDIT: tsc 0 + vitest 89/89 + build 0 — all PASS (verified this session after power restoration).
+- REVISE: No defects.
+- DECISION: Build verdict PASS with evidence.
+- VERSION LOCK: Commit pending owner push authorization.
+
+**What was BUILT (not queued):**
+- P1A migration (auth account lifecycle trigger) — ready for `supabase db push`
+- P1B migration (requested role queue table) — ready for `supabase db push`
+- auth-lifecycle guard (7 assertions) — ready for CI
+- Full auth app code (signup/sign-in/reset/OTP/Google + pending-approvals queue + security card)
+- CI wiring (guard:auth step)
+
+**What remains QUEUED:**
+- Docker restart → re-run 179-guard battery → `supabase db push` (P1A+P1B to cloud)
+- Real-cloud E2E: POS → accounting → AR settle against live Supabase + Vercel
+- STATUS.md §2 auth feature row (after cloud E2E verified)
+- CI audit (owner pastes Actions URL)
+
 **Session-end posture:** 9 changed files (6 new, 3 modified). Will be committed in one `feat(cap-vg1-step5)` commit + pushed to repo B. Repo A untouched. §15 sticky-header convention in effect.

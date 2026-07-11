@@ -3,7 +3,8 @@
 -- bootstrap. Runs on a FRESH post-reset DB (no company; the M6-seeded permission catalog present).
 -- Self-contained: BEGIN/ROLLBACK, leaves no data, no drift. Any DEFECT raises → fails under -v ON_ERROR_STOP=1.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- Owner auth identities (simulate Supabase Auth signup; the operator passes one to bootstrap — ownership is
 -- NOT granted by being first to register).

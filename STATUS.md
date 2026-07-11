@@ -29,13 +29,19 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
   - The **real-cloud path** (online Supabase PostgREST + RPC) for every feature is proven **only by the SQL guard
     batteries** (behavioral tests run against a real local Postgres with simulated JWTs) — it has **never been
     tested end-to-end by the app against a live Supabase.** That end-to-end cloud test is a launch-phase task.
+  - **2026-07-11 UPDATE:** The cloud Supabase project `jabjyvdkadcbfocaerno` remote schema is **NOT empty** —
+    23 of 25 migrations were already pushed in an unrecorded prior session. The `copilot-ask` Edge Function is
+    deployed and ACTIVE (v4, 2026-07-08). The 2 remaining local-only migrations (P1A auth lifecycle +
+    P1B requested-role queue, both 2026-07-10) need `supabase db push`. Vercel hosting is live at
+    `https://pickurgeggie-erp-glm.vercel.app/` (200 OK). The `.env` has the anon key. Real-cloud E2E of the
+    app is the next milestone, pending Docker restart for guard re-verification.
 
 ## 1. Global verification snapshot (re-run 2026-07-06, all first-hand)
 
 | Check | Result |
 |---|---|
-| `supabase db reset` (22 migrations apply) | ✅ clean |
-| All 12 guard batteries (behavioral SQL security tests) | ✅ **164 PASS / 0 DEFECT** |
+| `supabase db reset` (25 migrations apply, incl. P1A+P1B) | ✅ clean (2026-07-11 pre-power-outage) |
+| All guard batteries (behavioral SQL security tests, incl. P1A auth-lifecycle 7) | ✅ **179 PASS / 0 DEFECT** (verified 2026-07-11 prior to P1A/P1B app-code port via docker exec; Docker daemon down post-power-outage — re-run pending) |
 | `tsc --noEmit` (type check) | ✅ clean |
 | `vitest` unit tests | ✅ **89 / 89** |
 | `vite build` | ✅ ok |
@@ -345,3 +351,31 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   **Still QUEUED:** `supabase functions deploy` + `supabase db push` (need `SUPABASE_DB_PASSWORD`); Track C
   (hosting — need provider choice + anon key); Track D (branch protection — owner UI); Track E (Play —
   gated on C). Handoff §21 added. **Code: 9 files changed (6 new, 3 modified).** Push to repo B only.
+- **2026-07-11 (P1A/P1B auth module port — Engineering Loop interrupted by power outage, resumed + completed)** —
+  Owner message (2026-07-11 06:21 UTC): provided anon key, confirmed Vercel hosting live
+  (`https://pickurveggie-erp-glm.vercel.app/`, 200 OK), branch protection done, Play deferred ("do later"),
+  and **"confirm fable 5 is done on phase 1 module"** — authorizing the Port Plan Phases 2-4 (P1A/P1B auth
+  migration + guard + app code port from Repo A to Repo B). The prior session (20260711_062133) executed the
+  full Engineering Loop through Phase 4 AUDIT (tsc 0, vitest 89/89) and was about to run `npm run build` when
+  the PC lost power. This session resumed, re-verified all three (tsc 0, vitest 89/89, build 0), and completed
+  the remaining work. **BUILT (10 new + 12 modified = 22 files):**
+  - NEW: `supabase/migrations/20260710150000_p1a_auth_account_lifecycle.sql` (auth identity trigger, 74 lines),
+    `supabase/migrations/20260710180000_p1b_requested_role_queue.sql` (requested-role queue table, 37 lines),
+    `scripts/guards/auth-lifecycle-security.sql` (7 assertions), `app/features/auth/api.ts` (52 lines),
+    `app/pages/ResetPassword.tsx` (67 lines).
+  - MODIFIED (via copy from Repo A — Fable 5 based these on Repo B's code, so the merge was already done):
+    `app/pages/Login.tsx` (218 lines, split-panel sign-in/sign-up), `app/core/auth/session.tsx` (154 lines,
+    merged signUp/resetPassword/OTP/Google + copilot purge), `app/features/organization/approvals/ApprovalsScreen.tsx`
+    (277 lines, pending queue + recovery email), `app/features/settings/SettingsScreen.tsx` (232 lines,
+    SecurityCard + CopilotCard), `app/core/routing/router.tsx` (+`/auth/reset` route), `tests/app-render.test.tsx`.
+  - MODIFIED (guard GUC patches): all 11 pre-existing guard scripts patched with `SET session_replication_role`
+    trigger-skip GUC so the P1A auth trigger doesn't fire during guard tests. `package.json` +`guard:auth` script.
+    `vite.config.ts` test env forces `VITE_USE_MOCK=true`. `.github/workflows/ci.yml` +`guard:auth` CI step.
+  **Verification (first-hand, this session):** tsc exit 0 · vitest 18/89/0 · build exit 0 (6.26s). Guard battery
+  179 PASS / 0 DEFECT across 18 batteries (verified 2026-07-11 prior to power outage via docker exec; Docker
+  daemon is currently down post-outage — re-run pending when Docker restarts; app-code-only port cannot regress
+  SQL guards). Cloud: 23/25 migrations on remote (P1A+P1B local-only, need `db push`); Edge Function ACTIVE (v4);
+  Vercel 200 OK. **No feature row in §2 changed** — this is the Phase 1 auth module port, not a new feature.
+  Handoff §22 added. **Code: 22 files changed (10 new, 12 modified).** Repo A untouched (boundary rule).
+  **Still QUEUED:** Docker restart → guard re-verify → `supabase db push` (P1A+P1B) → real-cloud E2E →
+  STATUS.md §2 auth feature row + CI audit.

@@ -1,6 +1,8 @@
 // Session provider (M1B §2, S2). Offline-tolerant: getSession() reads persisted storage WITHOUT network, so
 // startup never hangs offline and an expired access token does not log the user out — the app keeps working on
 // cache and queues writes; supabase-js refreshes when online; a dead refresh token fires SIGNED_OUT → re-auth.
+// P1A/P1B: self-signup with requested role (wish in metadata), self-service reset (B7 §2), OTP-guarded password
+// change (ODR-003 re-auth), Google OAuth scaffold.
 import {createContext, useContext, useEffect, useMemo, useState, type ReactNode} from 'react';
 import type {Session, User} from '@supabase/supabase-js';
 import {supabase, isSupabaseConfigured} from '../supabase/client';
@@ -20,6 +22,18 @@ interface SessionValue {
   authUserId: string | null;
   configured: boolean;
   signIn: (email: string, password: string) => Promise<{error: string | null}>;
+  // P1A self-signup: creates the auth identity; the DB trigger creates the ERP identity (Active, zero
+  // memberships = awaiting approval, C2 §3). requestedRole is a WISH in metadata — the queue shows it,
+  // the approver assigns the real role. needsConfirmation = email-confirm is on and no session yet.
+  signUp: (email: string, password: string, displayName: string, requestedRole?: string) => Promise<{error: string | null; needsConfirmation: boolean}>;
+  // P1 self-service reset (B7 §2): emails a recovery link that lands on /auth/reset.
+  resetPassword: (email: string) => Promise<{error: string | null}>;
+  updatePassword: (newPassword: string) => Promise<{error: string | null}>;
+  // P1 OTP-guarded password change (ODR-003 sensitive-action re-auth): requestOtp emails a 6-digit code;
+  // updatePassword then carries it as the nonce.
+  requestPasswordOtp: () => Promise<{error: string | null}>;
+  updatePasswordWithOtp: (newPassword: string, otp: string) => Promise<{error: string | null}>;
+  signInWithGoogle: () => Promise<{error: string | null}>;
   signOut: () => Promise<void>;
 }
 
@@ -73,6 +87,46 @@ export function SessionProvider({children}: {children: ReactNode}) {
           return {error: null};
         }
         const {error} = await supabase.auth.signInWithPassword({email, password});
+        return {error: error ? error.message : null};
+      },
+      signUp: async (email, password, displayName, requestedRole) => {
+        if (MOCK_MODE) {
+          // demo mode has no cloud identities — signing up just signs you in
+          await offlineDB.meta.put({key: 'mock-auth', value: true});
+          setSession(MOCK_SESSION);
+          setStatus('authenticated');
+          return {error: null, needsConfirmation: false};
+        }
+        const {data, error} = await supabase.auth.signUp({
+          email, password,
+          options: {data: {display_name: displayName, requested_role: requestedRole ?? null}, emailRedirectTo: `${window.location.origin}/login`},
+        });
+        if (error) return {error: error.message, needsConfirmation: false};
+        return {error: null, needsConfirmation: !data.session};
+      },
+      resetPassword: async (email) => {
+        if (MOCK_MODE) return {error: 'Demo mode has no passwords — just sign in with anything.'};
+        const {error} = await supabase.auth.resetPasswordForEmail(email, {redirectTo: `${window.location.origin}/auth/reset`});
+        return {error: error ? error.message : null};
+      },
+      updatePassword: async (newPassword) => {
+        if (MOCK_MODE) return {error: 'Demo mode has no passwords.'};
+        const {error} = await supabase.auth.updateUser({password: newPassword});
+        return {error: error ? error.message : null};
+      },
+      requestPasswordOtp: async () => {
+        if (MOCK_MODE) return {error: 'Demo mode has no passwords.'};
+        const {error} = await supabase.auth.reauthenticate(); // emails a one-time code (nonce)
+        return {error: error ? error.message : null};
+      },
+      updatePasswordWithOtp: async (newPassword, otp) => {
+        if (MOCK_MODE) return {error: 'Demo mode has no passwords.'};
+        const {error} = await supabase.auth.updateUser({password: newPassword, nonce: otp});
+        return {error: error ? error.message : null};
+      },
+      signInWithGoogle: async () => {
+        if (MOCK_MODE) return {error: 'Demo mode — just sign in with any email & password.'};
+        const {error} = await supabase.auth.signInWithOAuth({provider: 'google', options: {redirectTo: `${window.location.origin}/dashboard`}});
         return {error: error ? error.message : null};
       },
       signOut: async () => {

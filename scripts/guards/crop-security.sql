@@ -4,7 +4,8 @@
 -- Runs as authenticated owners/workers with simulated JWT claims. Self-contained BEGIN/ROLLBACK; any DEFECT raises
 -- → fails under -v ON_ERROR_STOP=1.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres): two companies; A has branches A1+A2; an owner per company (crop.manage) + a worker who
 --    is a member of A2 ONLY and holds NO crop.manage. Company B gets a full catalog so isolation has data to hide.

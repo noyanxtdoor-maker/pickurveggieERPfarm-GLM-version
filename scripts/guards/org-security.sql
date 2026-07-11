@@ -3,7 +3,8 @@
 -- Runs as authenticated owners/invitees with simulated JWT claims. Self-contained BEGIN/ROLLBACK; any DEFECT
 -- raises → fails under -v ON_ERROR_STOP=1.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres): two companies, each with an owner holding the Module-1 management permissions ──
 insert into auth.users (instance_id, id, aud, role, email) values

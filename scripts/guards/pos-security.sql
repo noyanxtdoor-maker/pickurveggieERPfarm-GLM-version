@@ -4,7 +4,8 @@
 -- authority + no-oversell + pos.sell + branch isolation, and writes immutable (append-only) journals. Runs as
 -- authenticated owners/workers with simulated JWT. Self-contained BEGIN/ROLLBACK; any DEFECT raises under ON_ERROR_STOP.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres) ──
 insert into auth.users (instance_id, id, aud, role, email) values

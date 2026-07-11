@@ -33,6 +33,7 @@
     "guard:scheduling": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/scheduling-security.sql",
     "guard:projects": "psql \"postgresql://postgres:postgres@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/projects-security.sql",
     "guard:customers": "psql \"postgresql://postgres:***@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/customers-security.sql",
+    "guard:auth": "psql \"postgresql://postgres:***@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/auth-lifecycle-security.sql",
     "guard:copilot": "psql \"postgresql://postgres:***@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/cap-vg1-offline-degrade.sql",
     "guard:copilot:perm": "psql \"postgresql://postgres:***@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/cap-vg1-perm-isolation.sql",
     "guard:copilot:rls": "psql \"postgresql://postgres:***@127.0.0.1:54322/postgres\" -v ON_ERROR_STOP=1 -f scripts/guards/cap-vg1-rls-passthrough.sql",

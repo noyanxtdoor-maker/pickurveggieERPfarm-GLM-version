@@ -4,7 +4,8 @@
 -- branch isolated. Runs as authenticated owners/workers with simulated JWT. Self-contained BEGIN/ROLLBACK; any DEFECT
 -- raises → fails under -v ON_ERROR_STOP=1.
 \set ON_ERROR_STOP on
-begin;
+begin;set local app.p1a_skip_signup_trigger = '1';
+
 
 -- ── fixtures (postgres): companies A(branches A1,A2) + B(B1); owners hold product.manage + inventory.opening; a
 --    worker is a member of A2 only with NO inventory perms; one product per company (B exists for cross-company tests).

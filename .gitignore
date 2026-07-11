@@ -13,3 +13,6 @@ graphify-out/
 
 # Browser-probe scratch artifacts (session-local, not source)
 .tmp_capture/
+
+# Vercel local project link (session-local, not source — Vercel dashboard is the truth)
+.vercel/
