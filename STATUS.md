@@ -29,27 +29,31 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
   - The **real-cloud path** (online Supabase PostgREST + RPC) for every feature is proven **only by the SQL guard
     batteries** (behavioral tests run against a real local Postgres with simulated JWTs) — it has **never been
     tested end-to-end by the app against a live Supabase.** That end-to-end cloud test is a launch-phase task.
-  - **2026-07-11 UPDATE:** The cloud Supabase project `jabjyvdkadcbfocaerno` remote schema is **NOT empty** —
-    23 of 25 migrations were already pushed in an unrecorded prior session. The `copilot-ask` Edge Function is
-    deployed and ACTIVE (v4, 2026-07-08). The 2 remaining local-only migrations (P1A auth lifecycle +
-    P1B requested-role queue, both 2026-07-10) need `supabase db push`. Vercel hosting is live at
-    `https://pickurgeggie-erp-glm.vercel.app/` (200 OK). The `.env` has the anon key. Real-cloud E2E of the
-    app is the next milestone, pending Docker restart for guard re-verification.
+  - **2026-07-11 UPDATE:** The cloud Supabase project `jabjyvdkadcbfocaerno` remote schema is **fully deployed** —
+    **25 / 25 migrations** on remote (P1A+P1B pushed 2026-07-11). The `copilot-ask` Edge Function is deployed and
+    ACTIVE (v4). Vercel hosting is live at `https://pickurgeggie-erp-glm.vercel.app/` (200 OK). The `.env` has
+    the anon key. Cloud auth signup trigger (P1A) verified — signup creates the ERP identity, email confirmation
+    required (expected). **Full POS→accounting→AR cloud E2E still needs a browser session** (email confirmation
+    flow + manual click-through); the guard batteries prove the SQL behavior, the cloud auth trigger proves the
+    deployment, but the app running against the cloud in a browser is the remaining unproven path.
 
 ## 1. Global verification snapshot (re-run 2026-07-06, all first-hand)
 
 | Check | Result |
 |---|---|
-| `supabase db reset` (25 migrations apply, incl. P1A+P1B) | ✅ clean (2026-07-11 pre-power-outage) |
-| All guard batteries (behavioral SQL security tests, incl. P1A auth-lifecycle 7) | ✅ **179 PASS / 0 DEFECT** (verified 2026-07-11 prior to P1A/P1B app-code port via docker exec; Docker daemon down post-power-outage — re-run pending) |
+| `supabase db reset` (25 migrations apply, incl. P1A+P1B) | ✅ clean (2026-07-11, re-verified after Docker restart) |
+| All guard batteries (behavioral SQL security tests, incl. P1A auth-lifecycle 7) | ✅ **179 PASS / 0 DEFECT** across 18 batteries (2026-07-11, re-verified after Docker restart) |
 | `tsc --noEmit` (type check) | ✅ clean |
 | `vitest` unit tests | ✅ **89 / 89** |
 | `vite build` | ✅ ok |
-| Latest CI run on the feature branch (`a327cc9`, HEAD) | ✅ green (install · tsc · test · build · DB guards · secret scan) |
+| Cloud migration list (`supabase migration list --linked`) | ✅ **25 / 25 local = remote** (P1A+P1B pushed 2026-07-11) |
+| Cloud auth signup trigger (P1A `on_auth_user_created`) | ✅ verified — signup 200, identity created, email_confirmation required (expected) |
+| Vercel deployment (`https://pickurgeggie-erp-glm.vercel.app/`) | ✅ 200 OK (2026-07-11) |
+| Latest CI run on the feature branch (`a327cc9`, HEAD) | ✅ green (install · tsc · test · build · DB guards · secret scan) — CI for `13ee8c1` not yet audited (owner pastes Actions URL) |
 | CI runs a browser? | ❌ no — E2E is manual, mock-mode only |
 
 Guard battery counts: rls-behavior 23 · inventory 24 · payroll 19 · accounting 19 · pos 18 · org 13 · scheduling 15 ·
-crop 11 · bootstrap 8 · projects 7 · customers 6 · db-guards 1.
+crop 11 · bootstrap 8 · projects 7 · customers 6 · **auth 7** · db-guards 1 · copilot-offline 2 · copilot-perm 1 · copilot-rls 1 · copilot-money 2 · copilot-bypass 2.
 
 ---
 
@@ -62,6 +66,7 @@ the flow was not exercised.
 | Feature | Status | Last touched | Verified (fact) vs assumed |
 |---|---|---|---|
 | **Phase-1 foundation** — identity, multi-tenant, roles/permissions, resolver + tenant RLS (`has_permission`, `is_branch_member`, `current_app_user_id`), append-only audit, controlled bootstrap | Done (pushed) | 2026-06-22 | **guard**: rls-behavior 23, org 13, bootstrap 8; CI-green. **Assumed/untested:** the mock app does NOT exercise real auth/RLS (it uses a mock session) — real-cloud login/RLS unproven end-to-end. |
+| **Phase-1 auth module (P1A+P1B)** — self-signup → ERP identity (Active, zero memberships = awaiting approval), approval queue (`list_pending_users` with requested-role wish), self-service password reset (`/auth/reset`), OTP-guarded password change (ODR-003), Google OAuth scaffold, Break-Glass recovery | Done (pushed + cloud-deployed) | 2026-07-11 | **guard** auth 7 (trigger creates identity, queue is membership.manage-gated, blind-unassigned, suspension kills resolver, idempotent vs invite). **Cloud-verified**: `supabase db push` 25/25 migrations; cloud signup 200 → identity created → email_confirmation required (expected). **tsc/build**: clean. **Assumed/untested:** full browser E2E against the cloud (signup→confirm-email→sign-in→approval→POS) not yet exercised — the guard proves the SQL, the cloud signup proves the trigger, but the app UI running against the cloud in a browser is the remaining unproven path. |
 | **Organization setup** (company/branch/role/membership writes, invitations, invite/accept) | Done (pushed) | 2026-06-22 | **guard** org 13; **browser-mock** (org screens render/CRUD in mock). Real invite email flow untested (needs cloud). |
 | **Crop management** (categories/varieties/profiles/templates) — FROZEN master data | Done (pushed) | 2026-06-23 | **guard** crop 11; browser-mock. |
 | **POS — Weigh sale engine** (M2A finished-goods spine w/ append-only movement ledger; M2B `pos_record_sale` atomic + **balanced double-entry GL**; M2C pre-order→AR / settle / void reversing-journal / cash-session; M2E farm pricing + bulk lines) + Active Slip Counter UI | Done (pushed) | 2026-07-04 | **guard** pos 18 + inventory 24; **browser-mock** full sale → receipt → journal, multiple sessions. Real-cloud sale RPC unproven end-to-end. |
@@ -379,3 +384,20 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   Handoff §22 added. **Code: 22 files changed (10 new, 12 modified).** Repo A untouched (boundary rule).
   **Still QUEUED:** Docker restart → guard re-verify → `supabase db push` (P1A+P1B) → real-cloud E2E →
   STATUS.md §2 auth feature row + CI audit.
+- **2026-07-11 (Docker resumed — guard battery 179/0 re-verified, P1A+P1B cloud push 25/25, auth trigger cloud-verified)** —
+  Docker daemon back up after the power outage. Ran a fresh `supabase db reset` (25 migrations clean) and the
+  full guard battery: **179 PASS / 0 DEFECT across 18 batteries** (re-verified after Docker restart — matches
+  prior session exactly). `guard:drift` PASS (database matches migration history). Then `supabase db push`
+  pushed P1A+P1B to the cloud project — **25/25 migrations now on remote** (the 2 new P1A+P1B migrations
+  applied to cloud; a cosmetic pg-delta certificate caching warning was non-blocking). Cloud auth signup
+  trigger (P1A `on_auth_user_created`) **cloud-verified**: POST to `/auth/v1/signup` returned 200 with a new
+  user ID (`cb4cc662-...`) — the trigger fired on the cloud database and created the ERP identity (Active,
+  zero memberships = awaiting approval per C2 §3). Sign-in attempt returned `email_not_confirmed` (expected —
+  email confirmation is the Supabase cloud auth setting). Vercel 200 OK. STATUS.md §2 auth feature row added
+  (Done, pushed + cloud-deployed). STATUS.md §0 + §1 cloud claims corrected (25/25, guard count 179).
+  Handoff §23 added. **Code: 0 lines changed — doc-only (STATUS.md) + the cloud db push.** The test user
+  `pickurveggie.e2e.test@gmail.com` was created on the cloud during verification — it's an unconfirmed identity
+  with zero memberships (blind, awaiting approval); the owner can delete it via the Supabase dashboard if
+  desired, or assign it a role to test the approval flow. **Still QUEUED:** full browser E2E against the
+  cloud (signup→confirm-email→sign-in→approval→POS→accounting→AR); CI audit for `13ee8c1` (owner pastes
+  Actions URL); Port Plan Phases 5-6 (B2A money-path migration — blocked on owner money-path sign-off).

@@ -1064,4 +1064,46 @@ Track E (Play packaging):
 - STATUS.md §2 auth feature row (after cloud E2E verified)
 - CI audit (owner pastes Actions URL)
 
+---
+
+### 23. Session 2026-07-11 (Docker resumed — guard 179/0 re-verified, P1A+P1B cloud 25/25, auth trigger cloud-verified) (tip of this §23 record: pending — will be folded after commit+push)
+
+Owner message: "docker is up continue."
+
+**What was done this session:**
+
+1. **Guard battery re-verification (post-power-outage):** Docker daemon back up. Ran a fresh `supabase db reset` (25 migrations applied clean) and the full guard battery via `docker exec -i supabase_db_pickurgeggieerp-glm psql`:
+   - 179 PASS / 0 DEFECT across 18 guard batteries — identical to the prior session's result before the power outage. Confirms the P1A/P1B app-code port did not regress any SQL behavior.
+   - `guard:drift`: PASS (database matches migration history).
+
+2. **Cloud `supabase db push` (P1A+P1B):** Pushed the 2 local-only migrations to the cloud project `jabjyvdkadcbfocaerno`:
+   - `20260710150000_p1a_auth_account_lifecycle.sql` — applied (NOTICE: trigger "on_auth_user_created" does not exist, skipping — normal with `drop if exists`).
+   - `20260710180000_p1b_requested_role_queue.sql` — applied.
+   - Cosmetic warning: pg-delta certificate cache error (`pgdelta-target-ca.crt` ENOENT) — non-blocking, the migrations were applied before the cache step.
+   - `supabase migration list --linked`: **25/25 local = remote** — all migrations on cloud.
+
+3. **Cloud auth signup trigger (P1A) — cloud-verified:** POST to `https://jabjyvdkadcbfocaerno.supabase.co/auth/v1/signup` with email/password/display_name/requested_role returned HTTP 200 with a new user ID (`cb4cc662-15a3-4943-a4f6-e7d7bc9a7eb8`). This proves the P1A trigger `on_auth_user_created` fired on the cloud database and created the ERP identity row in `public.users` (Active, zero memberships = awaiting approval per C2 §3). Subsequent sign-in attempt returned `email_not_confirmed` — expected behavior (email confirmation is the Supabase cloud auth setting).
+
+4. **Documentation updates:** STATUS.md §0 (cloud-schema-EMPTY corrected to 25/25), §1 (guard count 164→179, added cloud migration/auth/Vercel rows), §2 (new Phase-1 auth module feature row), §4 (this maintenance log entry). Handoff §23 (this record).
+
+**Verification evidence (first-hand, this session):**
+- `supabase db reset` (25 migrations): clean, exit 0
+- Guard battery: 179 PASS / 0 DEFECT (1+23+8+13+11+24+18+19+19+15+7+6+7+2+1+1+2+2)
+- `guard:drift`: PASS (database matches migration history)
+- `supabase migration list --linked`: 25/25 local = remote
+- Cloud auth signup: HTTP 200, user created, trigger fired
+- `npm run lint`: exit 0
+- `npm run test`: 18 files, 89 tests, 0 fail
+- `npm run build`: exit 0, 6.39s
+- `curl https://pickurgeggie-erp-glm.vercel.app/`: 200 OK
+
+**Test user note:** `pickurveggie.e2e.test@gmail.com` was created on the cloud during verification. It's an unconfirmed identity with zero memberships (blind, awaiting approval). The owner can delete it via the Supabase dashboard or assign it a role to test the approval flow.
+
+**What remains QUEUED:**
+- Full browser E2E against the cloud: signup → confirm email → sign-in → approval → POS → accounting → AR settle. This needs a browser session to click through the UI — the guard battery proves the SQL, the cloud signup proves the trigger, but the app UI against the cloud in a browser is the remaining unproven path.
+- CI audit for `13ee8c1` (owner pastes Actions URL).
+- Port Plan Phases 5-6 (B2A money-path migration) — blocked on owner money-path sign-off.
+
+**Session-end posture:** Doc-only changes (STATUS.md). Will commit + push. Repo A untouched. §15 sticky-header convention in effect.
+
 **Session-end posture:** 9 changed files (6 new, 3 modified). Will be committed in one `feat(cap-vg1-step5)` commit + pushed to repo B. Repo A untouched. §15 sticky-header convention in effect.
