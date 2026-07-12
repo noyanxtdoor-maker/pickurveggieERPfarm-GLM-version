@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { db } from '../db';
 import { User, UserRole } from '../lib/types';
-import { Shield, Sparkles, Check, X, Clock, HelpCircle } from 'lucide-react';
+import { Shield, Sparkles, Check, X, Clock, HelpCircle, RefreshCw } from 'lucide-react';
 
 interface AuthProps {
   currentUser: User | null;
@@ -137,6 +137,37 @@ export function Auth({ currentUser, setCurrentUser, onRefresh }: AuthProps) {
     onRefresh();
   };
 
+  // BUG #3 (handoff 002 §3): AwaitingApproval auto-poll — every 15s + on window focus,
+  // re-read the pending user's `approved` flag from Dexie (mock-mode source-of-truth).
+  // When it flips to true (an admin approved in another session/tab), run the same
+  // post-approval sequence the manual flows use so the user enters the app with no
+  // manual reload. NOTE: when the online seam lands, this Dexie read is replaced by
+  // a `has_permission` / `auth.refresh()` RPC call per Team A's pattern (their STATUS L253).
+  useEffect(() => {
+    if (!pendingApproval || !username.trim()) return;
+
+    const checkApproval = async () => {
+      const u = await db.users.get(username.trim().toLowerCase());
+      if (u && u.approved) {
+        setPendingApproval(false);
+        setCurrentUser(u);
+        localStorage.setItem('puv_logged_user', u.username);
+        onRefresh();
+      }
+    };
+
+    checkApproval(); // run once on mount so a race-approve during signup is caught
+    const intervalId = window.setInterval(checkApproval, 15000);
+    const onFocus = () => checkApproval();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      window.clearInterval(intervalId);
+      window.removeEventListener('focus', onFocus);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingApproval, username]);
+
   if (pendingApproval) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-farm-bg p-4">
@@ -155,6 +186,11 @@ export function Auth({ currentUser, setCurrentUser, onRefresh }: AuthProps) {
             <h4 className="font-semibold text-farm-green mb-1">Registration Details:</h4>
             <div>Username: <span className="font-mono text-farm-ink font-semibold">{username}</span></div>
             <div>Requested Role: <span className="font-semibold px-2 py-0.5 rounded bg-farm-accent-soft text-farm-green text-[10px] uppercase font-bold">{role}</span></div>
+          </div>
+
+          <div className="flex items-center justify-center gap-1.5 text-[11px] text-farm-muted mb-4">
+            <RefreshCw className="w-3 h-3 animate-spin" style={{ animationDuration: '3s' }} />
+            <span>Checking approval status every 15s and on window focus…</span>
           </div>
 
           <button
