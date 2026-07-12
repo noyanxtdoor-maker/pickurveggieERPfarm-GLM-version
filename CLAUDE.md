@@ -143,6 +143,7 @@ escalate.** Touching any of these is High-risk (C4 §5).
 - Verify local ↔ origin synchronization.
 - Read the latest handoff document.
 - Load the authority documents the task requires.
+- Load `.claude/skills/engineering-discipline/SKILL.md` at session start; run its §9 pre-commit ritual before every commit; §1 working-tree covenant before every generator/scaffold.
 
 **Session end:**
 - Scope was respected (no unrelated changes).
