@@ -1072,7 +1072,7 @@ Owner message: "docker is up continue."
 
 **What was done this session:**
 
-1. **Guard battery re-verification (post-power-outage):** Docker daemon back up. Ran a fresh `supabase db reset` (25 migrations applied clean) and the full guard battery via `docker exec -i supabase_db_pickurgeggieerp-glm psql`:
+1. **Guard battery re-verification (post-power-outage):** Docker daemon back up. Ran a fresh `supabase db reset` (25 migrations applied clean) and the full guard battery via `docker exec -i supabase_db_pickurveggieerp-glm psql`:
    - 179 PASS / 0 DEFECT across 18 guard batteries — identical to the prior session's result before the power outage. Confirms the P1A/P1B app-code port did not regress any SQL behavior.
    - `guard:drift`: PASS (database matches migration history).
 
@@ -1095,7 +1095,7 @@ Owner message: "docker is up continue."
 - `npm run lint`: exit 0
 - `npm run test`: 18 files, 89 tests, 0 fail
 - `npm run build`: exit 0, 6.39s
-- `curl https://pickurgeggie-erp-glm.vercel.app/`: 200 OK
+- `curl https://pickurveggie-erp-glm.vercel.app/`: 200 OK
 
 **Test user note:** `pickurveggie.e2e.test@gmail.com` was created on the cloud during verification. It's an unconfirmed identity with zero memberships (blind, awaiting approval). The owner can delete it via the Supabase dashboard or assign it a role to test the approval flow.
 

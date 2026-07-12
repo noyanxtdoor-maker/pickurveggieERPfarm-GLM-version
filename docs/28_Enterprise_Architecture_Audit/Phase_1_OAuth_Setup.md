@@ -11,7 +11,7 @@ waits in the Approvals queue like any email signup (C2 §3 — identity never gr
 1. **Google Cloud Console** (console.cloud.google.com) → create/pick a project → *APIs & Services →
    OAuth consent screen*: External · app name "PickUrVeggie ERP" · your support email → save.
 2. *APIs & Services → Credentials → Create credentials → OAuth client ID* → type **Web application**:
-   - Authorized JavaScript origins: `https://pickurgeggie-erp-glm.vercel.app` (and `http://localhost:3000` for dev).
+   - Authorized JavaScript origins: `https://pickurveggie-erp-glm.vercel.app` (and `http://localhost:3000` for dev).
    - Authorized redirect URI: `https://jabjyvdkadcbfocaerno.supabase.co/auth/v1/callback`
    - Copy the **Client ID** and **Client secret**.
 3. **Supabase dashboard** → project `jabjyvdkadcbfocaerno` → *Authentication → Sign In / Up → Providers →

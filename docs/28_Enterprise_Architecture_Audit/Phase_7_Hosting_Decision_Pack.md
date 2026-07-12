@@ -5,7 +5,7 @@
 server code, no secrets on the host (the anon key is public by design; RLS is the security).
 
 > **2026-07-11 RESOLUTION:** The owner chose **Vercel** (already integrated with the Supabase project).
-> The app is live at `https://pickurgeggie-erp-glm.vercel.app/` (200 OK). The comparison table below is
+> The app is live at `https://pickurveggie-erp-glm.vercel.app/` (200 OK). The comparison table below is
 > preserved as historical reference. The SPA-fallback config + build settings are configured in the
 > Vercel dashboard; env vars `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set in the Vercel project.
 > The Supabase Auth redirect allow-list includes the Vercel domain. Track E (Play/AAB) is gated on this

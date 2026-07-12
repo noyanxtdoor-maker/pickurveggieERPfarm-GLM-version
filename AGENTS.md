@@ -84,7 +84,7 @@ Repo-specific commands that differ from defaults:
   (npm guard scripts use bare `psql` = CI-only). NOTE: both repos' local stacks share ports 54321/54322 —
   never `supabase stop` the OTHER repo's running stack; coordinate through the owner.
 - CI self-check: `printf "protocol=https\nhost=github.com\n\n" | git credential fill` → take `password=`
-  as a Bearer token → `GET api.github.com/repos/noyanxtdoor-maker/pickurgeggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.
+  as a Bearer token → `GET api.github.com/repos/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.
   // B: Repo B's GitHub path. Never print the token.
 - Cloud psql: session pooler `aws-0-ap-northeast-1.pooler.supabase.com:5432`, user
   `postgres.jabjyvdkadcbfocaerno` (the direct `db.<ref>` host is IPv6-only). // B: Repo B's pooler user.

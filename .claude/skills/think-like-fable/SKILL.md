@@ -91,7 +91,7 @@ from Dexie/Postgres, not from the UI) → commit → push → confirm CI green �
 - **CI self-check** (no owner paste needed): `printf "protocol=https\nhost=github.com\n\n" | git credential fill`
   → take `password=` as a Bearer token →
   `GET api.github.com/repos/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.
-  // B: Repo B's GitHub path (note the spelling: `pickurgeggieERPfarm-GLM-version`, lowercase; verify by `git remote -v`).
+  // B: Repo B's GitHub path (note the spelling: `pickurveggieERPfarm-GLM-version`, lowercase; verify by `git remote -v`).
   **Never print the token.**
 - **Commits:** write the message to a scratch file and `git commit -F <file>` — PowerShell
   here-string quoting corrupts inline multi-line messages.
@@ -109,7 +109,7 @@ from Dexie/Postgres, not from the UI) → commit → push → confirm CI green �
 - **Cloud/infra** (Supabase project, hosting, Play packaging, signup-approval queue): owner-timed.
 - Never modify locked migrations. Never push to `main`/`develop`. Never rewrite shared history.
 - **Repo boundary (owner, 2026-07-08):** GLM 5.2 / MiniMax M3 work **Repo B** (this repo,
-  `github.com/noyanxtdoor-maker/pickurgeggieERPfarm-GLM-version`, Supabase `jabjyvdkadcbfocaerno`).
+  `github.com/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version`, Supabase `jabjyvdkadcbfocaerno`).
   Claude models work **Repo A**
   (`../pick-ur-veggie-farm`, `github.com/noyanxtdoor-maker/pick-ur-veggie-farm`,
   Supabase `aqhxhamdwmhcwxmebqbo`). **Never write to Repo A** — reading it to learn
