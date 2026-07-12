@@ -137,15 +137,23 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   permissions context. NOT shipped in this session — recorded here as a real open issue. Owned by: future
   session. Money-path gate: NO (auth-domain, not GL postings), but cross-vendor review still required per
   AGENTS.md §2 because it touches the auth-session lifecycle.
-- **6. Auth-domain test-coverage gap.** Open.
+- **6. Auth-domain test-coverage gap.** **RESOLVED 2026-07-12** (commit pending, see §4 below).
   The 18 vitest files / 89 tests exercise `app/features/*` and `app/core/offline/*` (POS, accounting,
   payroll, inventory, customers, scheduling, projects, prefs, mocks, offline queue) — all 33 imports target
   `@/app/*`. None of them test `app/core/auth/session.tsx`'s Supabase Auth wrapper (signin/signup/signout/
   getSession/onAuthStateChange/OTP-guarded password change) or assert Bug #7's invariant (no top-bar Sign
-  Out button in `AppShell.tsx`; logout reachable only via Settings). Adding `tests/auth-session.test.tsx`
-  (mock supabase-js, assert signIn/signUp routing + MOCK_MODE short-circuit + signOut cache purge) and
-  `tests/bug-7-no-topbar-signout.test.tsx` (render `<App/>`, assert no Sign Out button in top bar by
-  role+name query) would close the gap. NOT shipped this session — recorded here. Owned by: future session.
+  Out button in `AppShell.tsx`; logout reachable only via Settings).
+  **Resolution:** added `tests/auth-session.test.tsx` (5 tests — MOCK_MODE branch: anonymous mount,
+  signIn sets mock-auth=true without cloud call, signOut preserves seeded demo data per the early-return at
+  session.tsx L137 — pins the live contract) + `tests/bug-7-invariant.test.tsx` (2 tests — anonymous Login
+  has no Sign Out, authenticated AppShell top-bar has no Sign Out button by role+name query). TDD iterated
+  through 4 fixes (vi.hoisted to escape the mock-factory hoist trap, aria-label assertion instead of text
+  content for AppShell-mount detection, in-memory localStorage shim to fix the prefs.ts "Cannot read
+  properties of undefined (reading 'getItem')" throw, afterEach cleanup to stop the first render leaking
+  state into the second). Suite: 18 → 20 files / 89 → 96 tests / 0 fail. Cloud-path coverage (the
+  supabase.auth.signUp-with-requested_role metadata shape) is a contract-pinning test only — the cloud
+  branches are unreachable while vitest pins VITE_USE_MOCK=true globally (per vite.config.ts L36); a
+  future task could split this into a per-file env override so the cloud branches can be exercised.
 
 ---
 
@@ -511,3 +519,64 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   **Lesson preserved in agent memory:** read the entrypoint manifest (index.html or the framework
   equivalent) FIRST before claiming a feature is missing in a web-app repo; never trust a `src/` grep
   without confirming `src/` is the served directory.
+
+- **2026-07-12 (auth-domain test coverage: closes STATUS §3 Open issue #6, follow-up to the
+  Bug #7 re-apply commit).** Session continued past the Bug #7 push (commit `6fbca8a`) with owner
+  authorization: "do all things that doesn't need my side of work" + commit/push authority granted.
+  Shipped the test-coverage follow-up that was queued for "next session" — delivered same session.
+  Two new test files added in `tests/`:
+  1. `tests/auth-session.test.tsx` (5 tests) — wraps `SessionProvider` from `app/core/auth/session.tsx`
+     in a `Probe` consumer; uses `vi.hoisted` to safely mock `@/app/core/supabase/client` (the plain
+     top-level const pattern trips vitest's mock-factory hoist — `ReferenceError: Cannot access
+     'authSpy' before initialization`; vi.hoisted is the documented escape — see the body of the
+     test file for the inline citation). Asserts: (a) anonymous mount when no mock-auth flag, with
+     `getSession` never called (MOCK_MODE short-circuit) — `authSpy.getSession.not.toHaveBeenCalled`;
+     (b) signIn sets `mock-auth=true` + status flips authenticated, no cloud `signInWithPassword`
+     call, pinning the mock-DB write path / Bug-7-not-touched-here boundary; (c) signOut flips anonymous +
+     `mock-auth=false` + PRESERVES seeded demo data (deliberate — session.tsx L137 early-return in
+     MOCK_MODE skips `purgeCache` so re-login boots straight into the populated demo environment; the
+     cloud branch at L139-141 DOES purge, but is unreachable from this suite while vitest pins
+     VITE_USE_MOCK=true globally per vite.config.ts L36); (d) cloud-branch spy-shape pinning for the
+     `signUp` `options.data.requested_role` metadata — the P1B "wish grants nothing" contract at
+     session.tsx L100-103; (e) cloud-path error-surfacing signature (error.message verbatim).
+     Tests (d)/(e) are contract-pinning only since MOCK_MODE=true in test env — the cloud branches
+     can't be exercised directly without a per-file env override (noted as future work).
+  2. `tests/bug-7-invariant.test.tsx` (2 tests) — renders the FULL `<App/>` (composed at `app/App.tsx`
+     L11-27 — SessionProvider → PermissionProvider → SyncProvider → Suspense → RouterProvider) and
+     asserts the Bug #7 invariant from BOTH auth states: (a) the anonymous Login screen has no
+     "Sign Out" affordance anywhere by role+name query; (b) with `mock-auth=true` seeded, the AppShell
+     mounts (verified by the unique aria-label "Switch to (light|dark) theme" theme-toggle button
+     at `app/components/layout/AppShell.tsx` L228-234 — Login has no theme toggle, so its presence
+     proves the AppShell mounted) and the top-bar has NO Sign Out button. This guards `6fbca8a`'s
+     Bug #7 fix against a future regression that reintroduces a top-bar Sign Out affordance.
+  TDD iterations (4 fixes between RED→GREEN): (i) `vi.hoisted` for the mock factory; (ii) the
+  AppShell-mount assertion switched from `getAllByText(/Branch (Live|Offline)/i)` (timing out
+  because the chip text is split across spans — testing-library text-fragment matching) → the more
+  stable aria-label query; (iii) `Object.defineProperty(globalThis, 'localStorage', {value: shim,
+  configurable: true})` + the same for sessionStorage — jsdom lacks Web Storage and AppShell's TopBar
+  calls `usePref` → `prefs.ts` L65 which reads `localStorage.getItem` in a `useState` initializer at
+  render time; without the shim the AppShell throws "Cannot read properties of undefined (reading
+  'getItem')" via React Router's default ErrorBoundary; (iv) `afterEach(() => cleanup())` because this
+  project's `vite.config.ts` pins `globals: false` (per the comment at L28 "explicit imports, no
+  globals") so @testing-library/react's auto-cleanup hook never registers — the first render leaked
+  React + jsdom state into the second test and the AppShell never mounted until afterEach cleanup
+  was added explicitly. The 4-step iteration is recorded inline in the test file headers so the next
+  contributor reading the file understands the shape of each shim.
+  Verified:
+  - `npx vitest run tests/auth-session.test.tsx tests/bug-7-invariant.test.tsx` — 2 files / 7 tests
+    / 0 fail, 2.87s, exit 0.
+  - `npm run test` (full suite) — 20 files / 96 tests / 0 fail, 2.76s, exit 0 (was 18 files / 89
+    tests before this commit — +2 files, +7 tests).
+  - `npm run lint` (tsc --noEmit — covers `app/` AND `tests/` per tsconfig.json paths
+    `@/*: ["./*"]` + no exclude) — exit 0. The new test files typecheck clean against
+    `@testing-library/react`'s `cleanup`/`render`/`screen`/`waitFor` + the
+    `vi.hoisted` generic return + the `Probe` JSX consumer wrapping `useSession`.
+  - `npm run build` (vite build — entry `app/main.tsx`) — ✓ built 5.96s, exit 0, bundle unchanged
+    `dist/assets/index-Bms4F_Oj.js 452.62 kB` — the new tests don't ship in dist (test files are
+    not in the app bundle), so the live app bundle is byte-identical to the `6fbca8a` build.
+  Section §3 Open issue #6 marked **RESOLVED 2026-07-12** with same-session pointer to this entry.
+  No remaining Open issues touched in §3 (#5 post-approval membership re-fetch friction remains
+  open, untouched this commit). Per Handoff 001 §1 sticky-rule: this entry references `6fbca8a` as
+  the PRIOR commit ( Bug #7 re-apply on the live `app/components/layout/AppShell.tsx`); this commit's
+  own SHA is not referenced. Repos untouched: cloud `jabjyvdkadcbfocaerno` untouched; Repo A
+  untouched (read-only boundary rule).
