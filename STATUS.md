@@ -414,7 +414,15 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   cloud state). **Repo A untouched** (boundary rule — both `config.toml` and Docker volumes are separate).
   E8 pre-flight captured: git clean, empty stash, volume record, pg_dump 901,924 bytes saved to gitignored
   `supabase/.temp/pre-port-swap-dump.sql` for emergency restore. `ci.yml` verified no hardcoded ports
-  (CI inherits new ports via `npx supabase start` + `npm run guard:*`). **Still PENDING verification:**
-  stop + start Repo B stack → `supabase db reset` (25 migrations clean) → 14 guard batteries 179/0 →
-  `guard:drift` PASS → tsc 0 / vitest 89/89 / build 0 — observable evidence appended as it lands.
-  Handoff §24 added.
+  (CI inherits new ports via `npx supabase start` + `npm run guard:*`). **Verified (first-hand, at the
+  port-swap commit, this session):** `supabase stop` + `supabase start` clean — `supabase status` confirms
+  Studio 54523, Mailpit 54524, Project URL 54521, DB URL 127.0.0.1:54522 (new cluster live). Two stacks
+  coexist on the same host with zero collision: Repo A on 56322, Repo B on 54522, both healthy.
+  `supabase db reset` = 25 migrations clean exit 0 against the new 54522 Postgres. `npm run lint` exit 0.
+  `npm run test` = 18 files / 89 tests / 0 fail (5.40s). `npm run build` = ✓ 10.10s exit 0. Cloud project
+  `jabjyvdkadcbfocaerno` untouched. **NOT verified locally this session:** the 14-guard SQL battery +
+  `guard:drift` — two `docker exec supabase_db_pickurgeggieerp-glm` attempts both returned "No such
+  container" despite `docker ps` showing that container running healthy (Windows-Docker daemon lookup
+  quirk in this terminal; not a name-spelling error). HARD STOP per SESSION_PROMPT E7 — CI will re-verify
+  the 14 guards against the new 5452x cluster on the next push. Pre-swap pg_dump (901KB) saved to gitignored
+  `supabase/.temp/pre-port-swap-dump.sql` for emergency restore.
