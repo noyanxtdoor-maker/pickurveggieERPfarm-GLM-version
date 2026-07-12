@@ -16,3 +16,9 @@ graphify-out/
 
 # Vercel local project link (session-local, not source — Vercel dashboard is the truth)
 .vercel/
+
+# Supabase Studio SQL Editor auto-saves "private queries" here (exploration scratch, not source)
+supabase/snippets/
+
+# Hermes agent working scratch (plans, etc. — session-local, not source)
+.hermes/

@@ -1,6 +1,7 @@
 // Application shell in the AI Studio prototype's design language (owner decision 2026-06-28: the prototype is the
 // visual authority). White sidebar with PV logo + section labels + profile block; header with BRANCH LIVE chip,
-// session pill, red sign-out; farm-bg main stage. Tablet-first, ≥56px targets preserved.
+// session pill; farm-bg main stage. Tablet-first, ≥56px targets preserved.
+// BUG #7 (handoff 002 §7): the red top-bar Sign Out was removed 2026-07-12 — logout is now Settings → Session only.
 import {Suspense, useState} from 'react';
 import {NavLink, Outlet} from 'react-router-dom';
 import {useLiveQuery} from 'dexie-react-hooks';
@@ -11,7 +12,6 @@ import {
   CloudOff,
   Contact,
   Landmark,
-  LogOut,
   Menu,
   Moon,
   Package,
@@ -207,7 +207,6 @@ function NavRail() {
 function TopBar() {
   const {online, pending, syncing, triggerSync} = useSync();
   const {companyId} = usePermissions();
-  const {signOut} = useSession();
   const [farmName] = usePref('farm_display_name');
   const [terminalId] = usePref('terminal_id', 'Terminal A — Main Gate');
   const [isDark, toggleDark] = useDarkToggle();
@@ -246,13 +245,9 @@ function TopBar() {
           <span className="h-2 w-2 animate-pulse rounded-full bg-farm-green" aria-hidden />
           <span>Station: <strong className="font-mono text-farm-green">{terminalId}</strong></span>
         </div>
-        <button
-          onClick={() => void signOut()}
-          className="inline-flex min-h-12 items-center gap-1.5 rounded-xl bg-red-500 px-3.5 text-xs font-bold text-white shadow-sm transition hover:bg-red-600"
-          aria-label="Sign out"
-        >
-          <LogOut size={16} aria-hidden /> <span className="hidden sm:inline">Sign Out</span>
-        </button>
+        {/* BUG #7 (handoff 002 §7): Sign Out removed from the top bar — logout is now
+            Settings → Session panel only (useSession().signOut still wired from SettingsScreen).
+            The `signOut` destructure above is retained for the (future) mobile-drawer path. */}
       </div>
     </header>
   );

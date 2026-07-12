@@ -121,6 +121,32 @@ the flow was not exercised.
 _Resolution status: **RESOLVED 2026-07-06** (commit `69a62be`, pushed). All four items verified by browser E2E +
 the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
 
+- **5. Post-approval membership re-fetch friction (the real shape of what handoff 002 called "Bug #3").**
+  Open.
+  Symptom: when an admin approves a pending signup in `app/features/organization/approvals/ApprovalsScreen.tsx`
+  (assigns a real membership via the governed RPC), the newly-approved user does NOT see their newly-granted
+  business data until they manually log out + log in again, or refresh the tab. There is no client-side
+  re-fetch of permissions/memberships on `window.focus` or on a polling timer.
+  Why it's open today (2026-07-12): the earlier attempt at this in `faf1c78` was wrong-locator (touched
+  dead `src/features/Auth.tsx` with a `setPendingApproval` UI gate — that flow only exists in the V2
+  prototype, not the live V3 `app/`). The live V3 flow shape is: signup → email-confirm → login → zero
+  memberships = blind to business data (C2 §3, see `ApprovalsScreen.tsx` L140 comment) → admin approves →
+  user re-logs-in / refreshes to fetch memberships. Fix shape: a `useEffect` on `window` `focus` (and/or
+  every N seconds while the session is active) that calls `supabase.auth.refreshSession()` or re-fetches
+  the user's memberships/permissions through the governed RPC, then triggers a React state refresh of the
+  permissions context. NOT shipped in this session — recorded here as a real open issue. Owned by: future
+  session. Money-path gate: NO (auth-domain, not GL postings), but cross-vendor review still required per
+  AGENTS.md §2 because it touches the auth-session lifecycle.
+- **6. Auth-domain test-coverage gap.** Open.
+  The 18 vitest files / 89 tests exercise `app/features/*` and `app/core/offline/*` (POS, accounting,
+  payroll, inventory, customers, scheduling, projects, prefs, mocks, offline queue) — all 33 imports target
+  `@/app/*`. None of them test `app/core/auth/session.tsx`'s Supabase Auth wrapper (signin/signup/signout/
+  getSession/onAuthStateChange/OTP-guarded password change) or assert Bug #7's invariant (no top-bar Sign
+  Out button in `AppShell.tsx`; logout reachable only via Settings). Adding `tests/auth-session.test.tsx`
+  (mock supabase-js, assert signIn/signUp routing + MOCK_MODE short-circuit + signOut cache purge) and
+  `tests/bug-7-no-topbar-signout.test.tsx` (render `<App/>`, assert no Sign Out button in top bar by
+  role+name query) would close the gap. NOT shipped this session — recorded here. Owned by: future session.
+
 ---
 
 ## 4. Maintenance log (append-only — do not delete history)
@@ -426,3 +452,62 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   quirk in this terminal; not a name-spelling error). HARD STOP per SESSION_PROMPT E7 — CI will re-verify
   the 14 guards against the new 5452x cluster on the next push. Pre-swap pg_dump (901KB) saved to gitignored
   `supabase/.temp/pre-port-swap-dump.sql` for emergency restore.
+
+- **2026-07-12 (process-failure-recovery: faf1c78 reverted, Bug #7 re-applied to live `app/`, path-A-1 plan
+  retired — the seam already exists).** An earlier commit `faf1c78` claimed to fix Bug #7 (top-bar Sign-Out,
+  `src/App.tsx` L285-292) and Bug #3 (AwaitingApproval auto-poll, `src/features/Auth.tsx` L138-168) and
+  appended an 88-line audit here in STATUS §4 including a "2C" finding that Repo B's auth is "mock-mode
+  prototype only — zero Supabase calls in Auth.tsx." That commit was wrong on every count and was reverted
+  by `git revert faf1c78` (a new commit, clean inverse, no squash — `faf1c78` still in history so the wrong
+  reasoning is auditable). Root cause: I scanned `src/` and missed `app/`. `index.html` L20 has
+  `<script type="module" src="/app/main.tsx"></script>` as the ONLY entrypoint; `index.html` L17 comment
+  reads verbatim "V2 prototype in /src is retained as reference only." /src is dead reference code; /app is
+  the live V3 app. Team A's Sonnet 5 caught this directly: "Team B scanned the wrong directory. Repo A's
+  real app (app/) has the full working seam" — same is true in Repo B. **The auth seam ALREADY EXISTS in
+  Repo B `app/core/auth/session.tsx`** (verified first-hand this turn, post-revert): L59
+  `supabase.auth.getSession()` (offline-tolerant — reads local-only, doesn't hang offline), L64
+  `supabase.auth.onAuthStateChange`, L89 `signInWithPassword`, L100-103 `signUp` with `requested_role` in
+  user metadata (P1B "wish that grants nothing" pattern), L126 Google OAuth `signInWithGoogle`, L132-141
+  `signOut` (with `purgeCache` + `purgeCopilotHistory`), L107-126 self-service password reset +
+  `requestPasswordOtp` + `updatePasswordWithOtp` (ODR-003 OTP-guarded password change). 30+ `.rpc()` calls
+  across `app/features/{auth,pos,accounting,payroll,inventory,customers,organization/invitations}/*` and
+  `app/pages/AcceptInvitation.tsx` and `app/core/api/repository.ts`. `MOCK_MODE` gates every cloud branch
+  with an `offlineDB.meta` keyed `'mock-auth'` local fallback — the three-way seam from AGENTS.md §3 is
+  BUILT, not missing. The "Phase 1 (P1A+P1B) Done" STATUS §2 row's caveat — "the mock app does NOT exercise
+  real auth/RLS" — applies to `src/` only and should be re-stated to refer to "the V2 prototype in src/";
+  the V3 app (/app) DOES exercise real auth when `MOCK_MODE=false`. **The path-A-1 "online-seam build" plan
+  saved at `.hermes/plans/2026-07-12_170606-online-seam-phase1-auth.md` is RETIRED** — there's nothing to
+  build from scratch; the seam exists. Future work in this domain is hardening + test-coverage (see §3), not
+  greenfield construction. **Bug #7 re-applied to the live file:** `app/components/layout/AppShell.tsx`
+  L249-255 had the red top-bar Sign Out button; deleted that block + replaced with a comment noting the
+  Settings-only-logout rule (handoff 002 §7). The unused `LogOut` lucide import (was L14) and the unused
+  `const {signOut} = useSession();` destructure (was L210) removed (no dead code, no YAGNI smell). The
+  `useSession` import retained (still used at L158 `const {user} = useSession();` for the sidebar profile
+  block). `SettingsScreen.tsx` L222 Sign Out (in Settings) is the only remaining logout affordance —
+  matches handoff 002 §7 "logout is Settings → Session panel only." **Verified first-hand at the post-fix
+  tree:** `npm run lint` (tsc --noEmit — `tsconfig.json` `paths: {"@/*": ["./*"]}` + no exclude of `app/`,
+  so tsc DOES cover `app/`) exit 0; `npm run test` (vitest run — 18 files / 89 tests / 0 fail, 4.04s; the 33
+  imports across the 18 test files ALL import from `@/app/*` — confirmed by grep — so the test suite IS
+  exercising live `app/` code, NOT the dead `src/` prototype; this reporter's earlier claim "tests validate
+  dead code" was a third mischaracterization, also corrected here); `npm run build` (vite build — entry is
+  `app/main.tsx` so the build DOES exercise the AppShell.tsx patch) ✓ built 6.92s exit 0, bundle delta
+  `dist/assets/index-D1nOlvtU.js  453.33 kB` → `dist/assets/index-Bms4F_Oj.js  452.62 kB` (-0.71 kB — the
+  removed Sign-Out JSX + LogOut icon import = ~700 bytes of real bundle shrink, hard evidence the fix is in
+  the LIVE bundle, not the dead prototype). **Bug #3 NOT re-applied** — the "AwaitingApproval auto-poll
+  every 15s + on focus" pattern was a `src/`-only UI flow with no equivalent in `app/`. The live V3 auth
+  flow per `app/core/auth/session.tsx` + `app/pages/Login.tsx` L162 is: signup → email-confirm → log in →
+  zero memberships = blind to all business data (C2 §3 — see
+  `app/features/organization/approvals/ApprovalsScreen.tsx` L140 verbatim comment); admin opens the
+  Approvals queue (uses `list_pending_users()` RPC at `app/features/auth/api.ts` L35) + assigns a real
+  membership → user re-fetches. There IS a real friction (user has to re-login / refresh to see data after
+  admin approval) but the fix shape is different (a permissions/membership re-fetch on focus, not a
+  `setPendingApproval` UI gate). That work is recorded in §3 Open issues as a real candidate, NOT shipped
+  today. **`.gitignore` additions** from the prior `faf1c78` reverted commit were re-applied here
+  independently (they are correct session-local hygiene): `supabase/snippets/` (Studio private-query
+  auto-saves) + `.hermes/` (agent working scratch — plans, etc.). **Per Handoff 001 §1 sticky-rule:** docs
+  never reference their own commit SHA — this entry mentions `faf1c78` as the before-revert commit name (a
+  PRIOR commit, not self-reference) and does not mention the SHA of the commit that this prose rides in.
+  **Repos untouched:** cloud `jabjyvdkadcbfocaerno` untouched; Repo A untouched (read-only boundary rule).
+  **Lesson preserved in agent memory:** read the entrypoint manifest (index.html or the framework
+  equivalent) FIRST before claiming a feature is missing in a web-app repo; never trust a `src/` grep
+  without confirming `src/` is the served directory.
