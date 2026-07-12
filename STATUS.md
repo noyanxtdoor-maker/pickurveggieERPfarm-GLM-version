@@ -401,3 +401,20 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   desired, or assign it a role to test the approval flow. **Still QUEUED:** full browser E2E against the
   cloud (signup→confirm-email→sign-in→approval→POS→accounting→AR); CI audit for `13ee8c1` (owner pastes
   Actions URL); Port Plan Phases 5-6 (B2A money-path migration — blocked on owner money-path sign-off).
+- **2026-07-12 (local-infra: Repo B Supabase port-cluster separated from Repo A — 5432x → 5452x)** —
+  Owner-authorized (reply: "yes B but becareful with it, we just want to seperate with them…future-proof
+  isolation, so both teams' local Supabase stacks never collide on the shared-machine fixed ports).
+  `supabase/config.toml`: 7 ports moved 5432x → 5452x (api 54321→54521, db 54322→54522, db shadow 54320→54520,
+  db.pooler 54329→54529, studio 54323→54523, inbucket 54324→54524, analytics 54327→54527; inbucket
+  commented smtp/pop3 also 54325/54326 → 54525/54526 for cluster consistency). `package.json`: 18 `guard:*`
+  scripts updated 127.0.0.1:54322 → 127.0.0.1:54522. `AGENTS.md` §3 + `.claude/skills/think-like-fable/SKILL.md`
+  §5: stale local-command reference (Repo A container name `supabase_db_pick-ur-veggie-farm`) replaced with
+  Repo B's real container `supabase_db_pickurveggieerp-glm` + the new 54522 port + the simultaneous-run
+  statement. **Cloud project untouched** (`VITE_SUPABASE_URL` in `.env` unchanged; local ports do not touch
+  cloud state). **Repo A untouched** (boundary rule — both `config.toml` and Docker volumes are separate).
+  E8 pre-flight captured: git clean, empty stash, volume record, pg_dump 901,924 bytes saved to gitignored
+  `supabase/.temp/pre-port-swap-dump.sql` for emergency restore. `ci.yml` verified no hardcoded ports
+  (CI inherits new ports via `npx supabase start` + `npm run guard:*`). **Still PENDING verification:**
+  stop + start Repo B stack → `supabase db reset` (25 migrations clean) → 14 guard batteries 179/0 →
+  `guard:drift` PASS → tsc 0 / vitest 89/89 / build 0 — observable evidence appended as it lands.
+  Handoff §24 added.

@@ -85,9 +85,11 @@ from Dexie/Postgres, not from the UI) → commit → push → confirm CI green �
 
 ## 5. Repo-specific commands (where this repo differs from defaults)
 
-- **Guards locally** (npm guard scripts call bare `psql` = CI-only):
-  `docker exec -i supabase_db_pick-ur-veggie-farm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
-  // B: container name may differ for Repo B's local stack — verify with `docker ps | grep supabase_db` first; adjust the container name to YOUR running stack and never `supabase stop` Repo A's stack (shared ports 54321/54322 — coordinate through the owner).
+- **Guards locally** (npm `guard:*` scripts also hit port 54522 — see package.json):
+  `docker exec -i supabase_db_pickurveggieerp-glm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
+  // B: Container name + port cluster for Repo B. Repo A uses the default cluster 54320–54329;
+  Repo B uses 54520–54529 (set 2026-07-12, see handoff §24). The two stacks can run simultaneously —
+  no port collision. Never `supabase stop` Repo A's stack; coordinate through the owner for shared-machine concerns.
 - **CI self-check** (no owner paste needed): `printf "protocol=https\nhost=github.com\n\n" | git credential fill`
   → take `password=` as a Bearer token →
   `GET api.github.com/repos/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.

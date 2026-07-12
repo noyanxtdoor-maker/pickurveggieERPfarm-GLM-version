@@ -1106,4 +1106,40 @@ Owner message: "docker is up continue."
 
 **Session-end posture:** Doc-only changes (STATUS.md). Will commit + push. Repo A untouched. §15 sticky-header convention in effect.
 
+**Session-end posture:** Doc-only changes (STATUS.md). Will commit + push. Repo A untouched. §15 sticky-header convention in effect.
+
 **Session-end posture:** 9 changed files (6 new, 3 modified). Will be committed in one `feat(cap-vg1-step5)` commit + pushed to repo B. Repo A untouched. §15 sticky-header convention in effect.
+
+---
+
+## §24 — 2026-07-12 Local-infra port-cluster separation (Repo B vs Repo A)
+
+**Owner authorization (in writing):** owner reply "yes B but becareful with it, we just want to seperate with them, we are doing this so in the future we wont have any problem" — Option B from the boundary-hardening decision menu, with the explicit goal of future-proof isolation so the two teams' local Supabase stacks never collide on the shared-machine fixed ports.
+
+**What changed (config + scripts):**
+- `supabase/config.toml` — 7 port values moved from the 5432x cluster to a dedicated 5452x cluster:
+  `[api] 54321→54521 · [db] 54322→54522 · [db] shadow_port 54320→54520 · [db.pooler] 54329→54529 · [studio] 54323→54523 · [inbucket] 54324→54524 · [analytics] 54327→54527`. Inbucket's commented `smtp_port`/`pop3_port` also updated `54325/54326 → 54525/54526` for cluster consistency.
+- `package.json` — 18 `guard:*` scripts updated: the `127.0.0.1:54322/postgres` substring → `127.0.0.1:54522/postgres`. Every guard script now hits the new DB direct port.
+- `AGENTS.md` §3 — the "Repo-specific commands" block: the local `docker exec` command was updated from the stale Repo A container name (`supabase_db_pick-ur-veggie-farm`) to Repo B's actual container name `supabase_db_pickurveggieerp-glm`, the new port 54522 is documented, and the "both repos' local stacks share ports 54321/54322" warning was replaced with the new separation statement.
+- `.claude/skills/think-like-fable/SKILL.md` §5 — same updates as `AGENTS.md` §3.
+
+**What did NOT change:**
+- The cloud project ref (`jabjyvdkadcbfocaerno`), the linked project, the 25 migration files, the RLS policies, the auth config, the storage buckets, the edge functions. Local ports do not touch cloud state — `VITE_SUPABASE_URL` in `.env` is unchanged and points at the cloud, not at a local host.
+- The Supabase Docker container name `supabase_db_pickurveggieerp-glm` — unchanged (this was already the Repo-B container name per the §16 Option 1+2 hardening 2026-07-08).
+- Repo A's `supabase/config.toml` and Repo A's container/volumes — untouched (read-only sibling repo, boundary rule).
+- All guard `.sql` files in `scripts/guards/` — none hardcode ports; they connect through the `psql` invocation passed by `package.json` scripts.
+- `.github/workflows/ci.yml` — runs `npx supabase start` (which reads `config.toml`) and `npm run guard:*` (which reads `package.json`); CI inherits the new ports automatically with no yml change. Verified by grep: zero hardcoded port references in `ci.yml`.
+
+**Why the 5452x cluster (+200 offset):** recognizable, parallel to the existing 5432x scheme, and a wide gap that avoids ephemeral Docker port-allocation ranges. Both stacks can now run simultaneously on the same machine — no port collision.
+
+**E8 pre-flight capture (before any start/stop):**
+- `git status --short`: clean
+- `git stash list`: empty
+- `docker volume ls | grep pickurveggieerp-glm`: local volume `supabase_db_pickurveggieerp-glm` exists (data persists across stop/start)
+- Repo A containers confirmed down (`docker ps` shows no `supabase_*_pick-ur-veggie-farm`)
+- Pre-swap snapshot: `docker exec supabase_db_pickurveggieerp-glm pg_dump -U postgres -d postgres > supabase/.temp/pre-port-swap-dump.sql` — 901,924 bytes saved to the gitignored `supabase/.temp/` for emergency restore if the swap corrupted anything.
+
+**Verification (first-hand, this session, AFTER the change):**
+*Pending — the stop/start + `supabase db reset` + 14-guard battery + tsc/vitest/build sequence runs in the next work-block of this session. Results will be appended here as observable evidence, not adjectives. (Per Handoff 001 §1: docs never reference their own commit's SHA — the commit SHA appears in `git log`, not in this prose.)*
+
+**Session-end posture:** Config + scripts + docs changed in one `chore(local-infra)` commit. Repo A untouched. §15 sticky-header convention in effect.

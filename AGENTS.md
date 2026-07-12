@@ -80,9 +80,10 @@ back from IndexedDB/Postgres, never trust the UI) → commit (`git commit -F <ms
 CI ACTUALLY green (see command below) → STATUS.md + handoff + Team-B handoff file.
 
 Repo-specific commands that differ from defaults:
-- Guards locally: `docker exec -i supabase_db_pick-ur-veggie-farm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
-  (npm guard scripts use bare `psql` = CI-only). NOTE: both repos' local stacks share ports 54321/54322 —
-  never `supabase stop` the OTHER repo's running stack; coordinate through the owner.
+- Guards locally: `docker exec -i supabase_db_pickurveggieerp-glm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
+  (npm `guard:*` scripts also use port 54522 — see package.json). // B: Repo B's container name + port cluster.
+  Repo A uses the default port cluster 54320–54329; Repo B uses 54520–54529 (set 2026-07-12, see handoff §24).
+  The two stacks can run **simultaneously** — no port collision. Never `supabase stop` the OTHER repo's running stack; coordinate through the owner for shared-machine concerns.
 - CI self-check: `printf "protocol=https\nhost=github.com\n\n" | git credential fill` → take `password=`
   as a Bearer token → `GET api.github.com/repos/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.
   // B: Repo B's GitHub path. Never print the token.
