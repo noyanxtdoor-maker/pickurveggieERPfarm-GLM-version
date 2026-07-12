@@ -282,10 +282,14 @@ export default function App() {
               <span>Session: <strong className="font-mono text-farm-green">{currentUser.username}</strong></span>
             </div>
 
-            {/* BUG #7 (handoff 002 §7): Sign Out removed from the top bar — logout is now
-                Settings → Session panel only (the parent onLogout prop still routes there).
-                The mobile drawer's bottom Sign Out is intentionally kept (mobile has no
-                top-bar affordance; reach Settings → Session there too). */}
+            <button 
+              onClick={handleLogout}
+              title="Sign out of regional terminal"
+              className="bg-red-500 hover:bg-red-650 px-3.5 py-1.5 rounded-xl font-bold cursor-pointer transition text-xs flex items-center gap-1.5 shadow-sm text-white"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </header>
 
