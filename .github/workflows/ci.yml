@@ -95,7 +95,7 @@ jobs:
           # actually succeeds with that password. Max 30s; abort cleanly if it never
           # comes up.
           tries=0
-          until psql "postgresql://postgres:***@127.0.0.1:54522/postgres" -v ON_ERROR_STOP=1 -c "select 1 as ready" >/dev/null 2>&1 ; do
+          until psql "postgresql://postgres:postgres@127.0.0.1:54522/postgres" -v ON_ERROR_STOP=1 -c "select 1 as ready" >/dev/null 2>&1 ; do
             tries=$((tries + 1))
             if [ $tries -ge 30 ] ; then
               echo "::error::local Postgres on :54522 not accepting password auth after 30s; aborting"
