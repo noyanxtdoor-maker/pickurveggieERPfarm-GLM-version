@@ -23,9 +23,9 @@ insert into public.companies (id, company_code, name) values
   ('11111111-1111-1111-1111-111111111111','CO-A','Company A');
 insert into public.branches (id, company_id, branch_code, name) values
   ('a1111111-1111-1111-1111-111111111111','11111111-1111-1111-1111-111111111111','BR-A1','Branch A1');
-insert into public.roles (id, company_id, role_key, description) values
-  ('20000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','owner','Owner A'),
-  ('20000000-0000-0000-0000-00000000000c','11111111-1111-1111-1111-111111111111','worker','Worker');
+insert into public.roles (id, company_id, role_key, description, rank) values
+  ('20000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','owner','Owner A',50),
+  ('20000000-0000-0000-0000-00000000000c','11111111-1111-1111-1111-111111111111','worker','Worker',0);
 insert into public.role_permissions (company_id, role_id, permission_id)
   select '11111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a', id from public.permissions
   where permission_key in ('membership.manage','membership.read','user.read','product.manage');

@@ -9,6 +9,8 @@ export type AccountStatus = 'Active' | 'Suspended';
 // user_branch_roles.assignment_status is ONLY these two (M3) — there is NO "Suspended" (M1C gap G3).
 export type AssignmentStatus = 'Active' | 'Expired';
 export type InvitationStatus = 'Pending' | 'Accepted' | 'Revoked' | 'Expired';
+// user_permission_overrides.effect CHECK (P1C §2.4) — 'null' is the RPC clear-signal, not a third value.
+export type OverrideEffect = 'grant' | 'deny';
 
 export interface Company {
   id: string;

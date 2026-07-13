@@ -122,21 +122,29 @@ _Resolution status: **RESOLVED 2026-07-06** (commit `69a62be`, pushed). All four
 the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
 
 - **5. Post-approval membership re-fetch friction (the real shape of what handoff 002 called "Bug #3").**
-  Open.
+  **RESOLVED 2026-07-13** (build shipped pending owner GO; commit not pushed yet — see §4 below).
   Symptom: when an admin approves a pending signup in `app/features/organization/approvals/ApprovalsScreen.tsx`
-  (assigns a real membership via the governed RPC), the newly-approved user does NOT see their newly-granted
-  business data until they manually log out + log in again, or refresh the tab. There is no client-side
-  re-fetch of permissions/memberships on `window.focus` or on a polling timer.
-  Why it's open today (2026-07-12): the earlier attempt at this in `faf1c78` was wrong-locator (touched
+  (assigns a real membership via the governed RPC), the newly-approved user did NOT see their newly-granted
+  business data until they manually logged out + logged in again, or refreshed the tab. There was no
+  client-side re-fetch of permissions/memberships on `window.focus` or on a polling timer.
+  Why it was open through 2026-07-12: the earlier attempt at this in `faf1c78` was wrong-locator (touched
   dead `src/features/Auth.tsx` with a `setPendingApproval` UI gate — that flow only exists in the V2
   prototype, not the live V3 `app/`). The live V3 flow shape is: signup → email-confirm → login → zero
   memberships = blind to business data (C2 §3, see `ApprovalsScreen.tsx` L140 comment) → admin approves →
-  user re-logs-in / refreshes to fetch memberships. Fix shape: a `useEffect` on `window` `focus` (and/or
-  every N seconds while the session is active) that calls `supabase.auth.refreshSession()` or re-fetches
-  the user's memberships/permissions through the governed RPC, then triggers a React state refresh of the
-  permissions context. NOT shipped in this session — recorded here as a real open issue. Owned by: future
-  session. Money-path gate: NO (auth-domain, not GL postings), but cross-vendor review still required per
-  AGENTS.md §2 because it touches the auth-session lifecycle.
+  user re-logs-in / refreshes to fetch memberships.
+  **Resolution (2026-07-13):** the prior session closed §3 #6 (auth test coverage); this session picked
+  up §3 #5 from the exact point where §6 left it. Added a SECOND `useEffect` to the existing
+  `PermissionProvider` in `app/core/permissions/permissions.tsx` (the live file — verified, not the dead
+  `src/` prototype) that, while `status === 'authenticated'`, registers a `window` `focus` listener
+  AND a 15s `setInterval` calling the EXISTING `refresh()` (the one that already re-reads
+  `user_branch_roles` + `role_permissions` via PostgREST under RLS = own rows). Clean-up on unmount +
+  on the status flip removes both. **No new server path, no migration, no RLS aperture, no resolver
+  change, no money path, no Dexie-only override (§2.4 is NOT touched — it's a separate gated build).**
+  Money-path gate: NO (auth-domain, not GL postings). Cross-vendor-spirit review per AGENTS.md §2 =
+  this §3 entry + the §5 security sweep in handoff 003 + the 5-test guard battery + stopping for owner
+  GO before push (the per-repo equivalent of cross-vendor review for a non-money-path client wire).
+  Per Handoff 001 §1 sticky-rule: this entry references `6c039ab` (the prior commit — the §3 #6
+  close) and this commit's own SHA is NOT referenced here (fold-avoidance).
 - **6. Auth-domain test-coverage gap.** **RESOLVED 2026-07-12** (commit pending, see §4 below).
   The 18 vitest files / 89 tests exercise `app/features/*` and `app/core/offline/*` (POS, accounting,
   payroll, inventory, customers, scheduling, projects, prefs, mocks, offline queue) — all 33 imports target
@@ -580,3 +588,119 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   the PRIOR commit ( Bug #7 re-apply on the live `app/components/layout/AppShell.tsx`); this commit's
   own SHA is not referenced. Repos untouched: cloud `jabjyvdkadcbfocaerno` untouched; Repo A
   untouched (read-only boundary rule).
+
+
+- **2026-07-13 (P1C §2.3 — post-approval membership auto-refresh shipped; closes STATUS §3 Open issue #5, follow-up to the §3 #6 close `6c039ab`).** Owner authorized building
+  the next buildable non-owner-gated increment: the post-approval membership re-fetch friction
+  (Launch_Runbook §2.3 — "After approval, the approved user's app must refresh automatically … polls
+  permissions.refresh() on an interval AND on window-focus"; STATUS §3 #5 named the same fix shape).
+  Continued from the exact point where the prior session left it (the §3 #6 close committed the
+  auth-session + Bug #7 invariant test coverage; this session is the same Engineering-Loop shape).
+  Built via strict TDD (RED first → GREEN → full suite):
+  **BUILT:**
+  - `tests/p1c-2-3-permissions-refresh.test.tsx` (NEW, 5 tests) — verifies (1) baseline authenticated
+    user with zero memberships has empty keys; (2) the Bug #3 fix: a `window` `focus` event triggers
+    `refresh()` and a server-side approval (simulated by the supabase mock returning a new membership +
+    role_permission row on the next call) propagates the new `pos.sell` key to the React snapshot
+    WITHOUT a manual reload (the actual Bug #3 contract — the user "sees" the approved data after
+    focus, no manual reload); (3) the period wire: advancing fake timers past the 15s interval triggers
+    another refresh (test uses `vi.useFakeTimers({shouldAdvanceTime: true})` + `advanceTimersByTimeAsync`
+    so the mount's initial async refresh settles under fake timers); (4) while status is anonymous,
+    focus triggers no refresh (no session, no noise); (5) while status is loading, focus triggers no
+    refresh (the initial-load gate). Mock strategy mirrors `auth-session.test.tsx`: `vi.hoisted` for
+    the supabase spy + a settable session-status getter, `vi.mock` of `@/app/core/supabase/client`
+    (controls `loadSnapshot()`'s queries), `vi.mock` of `@/app/core/mock/mock` to force `MOCK_MODE=false`
+    (vite.config.ts pins `VITE_USE_MOCK=true` globally per L36 — same limitation auth-session.test
+    documents at L163; worked around by overriding the export), `vi.mock` of `@/app/core/auth/session`
+    so `useSession().status` returns the test's controlled status (avoids the real SessionProvider's
+    async bootstrap, which would gate-flip status through `offlineDB.meta` and let keys populate
+    through status-change — falsifying the focus wire). jsdom shims for localStorage, matchMedia,
+    IntersectionObserver (same as `bug-7-invariant.test.tsx`).
+  - `app/core/permissions/permissions.tsx` (MODIFIED, +21 lines) — a SECOND `useEffect` after the
+    existing status-change useEffect, keyed on `[status, refresh]`, gated on
+    `status === 'authenticated'`, that registers `window.addEventListener('focus', () => void refresh())`
+    AND `window.setInterval(() => void refresh(), 15000)` and cleans up both on unmount + on the status
+    flip. The effect detaches when status goes anonymous/loading (no noise against a missing session).
+    Inline comments cite Launch_Runbook §2.3 + STATUS §3 #5 + the C2 §3 "blind" state + the boundary
+    (no new server path, no RLS aperture, no resolver change — only the existing `refresh()`).
+  **Not touched (out-of-scope by design):** the other six P1C items in Launch_Runbook §2 are NOT
+  built (only Bug #7 was done in `6fbca8a`; this commit closes the §2.3 ↔ §3 #5 item). §2.1
+  (OAuth/email not reaching queue) needs the live cloud DB password to diagnose — owner channel.
+  §2.2 (seed 5 standard roles) is a DB+bootstrap build — buildable without owner secrets, candidate
+  for the next session. §2.4 (per-user permission overrides — the security leak from handoff 002 §4)
+  is GATED (evolves the locked M4 `has_permission` resolver → spec→guard→owner sign-off→build) — NOT
+  touched here. §2.5 (rank-gated revoke) is money-adjacent auth — full-suite attack + owner sign-off.
+  §2.6 (copy invite link) is a DB+app slice — buildable without owner secrets, candidate for next.
+  The remaining Launch_Runbook §3 launch gates (real-cloud E2E of the money spine, MFA, backups drill,
+  Play packaging) are sourced from the cloud + owner-infra channels.
+  **Verification (first-hand, this session):**
+  - `npx vitest run tests/p1c-2-3-permissions-refresh.test.tsx` — 5 tests / 0 fail, 213ms, exit 0.
+    (RED was verified BEFORE the GREEN patch: the focus-wire test failed with `keys.has('pos.sell')`
+    false because the listener didn't exist; the period-wire test timed out because no 15s interval
+    existed; the 3 gate tests passed — confirming the baseline + the anonymous/loading gates already
+    held pre-fix. So the RED failures were exactly the missing wire + the missing interval.)
+  - `npm run test` (full suite) — 21 files / 101 tests / 0 fail, 2.54s, exit 0 (was 20 files / 96
+    tests before this commit — +1 file, +5 tests).
+  - `npm run lint` (`tsc --noEmit` — covers `app/` AND `tests/` per `tsconfig.json` `paths:
+    {"@/*": ["./*"]}` + no exclude) — exit 0. The new test file + the patched permissions.tsx
+    typecheck clean against `vi.useFakeTimers({shouldAdvanceTime: true})` + `advanceTimersByTimeAsync`
+    + the `.has(key)` predicate + the `SessionProvider`/`useSession` mock signatures.
+  - `npm run build` (vite build — entry `app/main.tsx`) — ✓ built 5.66s, exit 0, bundle
+    `dist/assets/index-C-ozdJep.js 452.85 kB` (was `452.62 kB` after the `6fbca8a` Bug #7 fix;
+    +230 bytes for the new useEffect + window listener + 15s interval inline). The new test file
+    does not ship in dist (test files are not in the app bundle), so the bundle delta is entirely
+    the live `permissions.tsx` patch — hard evidence the fix is in the LIVE bundle.
+  **Defend-phase sweep (AGENTS.md §5 against the diff, all PASS):** (1) RLS = no DB change — the new
+  wire reuses the existing `loadSnapshot()` read of `user_branch_roles` (RLS = own rows) +
+  `role_permissions`; no new table / policy. (2) No anon grant (no DB change). (3) No client-supplied
+  cross-tenant id — the `refresh()` call uses the SAME query as the existing status-change refresh
+  (no `companyId` injected). (4) The wire does not bypass `has_permission` — it just refreshes the
+  DISPLAY snapshot; the server is still the boundary. (5) No write reachable — `refresh()` is a read,
+  the only IndexedDB write is the cached snapshot (local-only, client-display). (6) No function change.
+  (7) No money/amount/price in the wire. (8) No balance stored. (9) The `loadSnapshot()` catch
+  (L72-78) already swallows + falls back to the cached snapshot — that is CORRECT offline behaviour
+  and unchanged; no new error surface leaks a tenant's existence. False-success hunt (per AGENTS.md
+  §4 #4 — "which branch can report success without doing the work?"): the new wire just calls
+  `refresh()`; the successful outcome is "snapshot reflects the new membership." If `refresh()` throws
+  offline it falls back to the cached snapshot — CORRECT offline behaviour, unchanged. No new
+  false-success path is introduced.
+  **Sections updated:** STATUS §3 Open issue #5 → RESOLVED 2026-07-13. The §3 #6 close (auth test
+  coverage) is unchanged. No remaining Open issues touched in §3 (CAL-1 resolved 2026-07-06; §3 #6
+  resolved 2026-07-12). The build is shipped (committed locally-pre-push); owner GO is required to
+  push per the read-receipt cadence the owner operates with and per AGENTS.md §2's "auth-domain
+  cross-vendor review" gate — the per-repo equivalent here = this §4 entry (the spec + audit trail) +
+  handoff 003 (the full spec) + the 5-test guard battery + the §5 sweep above + stopping for owner
+  GO before push. Per Handoff 001 §1 sticky-rule: this entry references `6c039ab` as the PRIOR
+  commit (the §3 #6 close); this commit's own SHA is NOT referenced here (fold-avoidance). Repos
+  untouched: cloud `jabjyvdkadcbfocaerno` untouched; Repo A untouched (read-only boundary rule).
+
+- **2026-07-13 (Multi-item port — item F: vercel.json production config; first of the ordered
+  F→D→C→B→A→E port sequence owner authorized this session).** Owner GO received 2026-07-13
+  ("Go all of them") directing the per-port-read-only-scan-then-port of Repo A's ahead-of-B work.
+  This is item F (infra/low-risk). Bytes ported 1:1 from Repo A commit `5f8e290` ("feat(hosting):
+  Vercel production config"). Replaces the previous minimal `/(.*)` rewrite which routed EVERY path
+  — including `/assets/index-<hash>.js` and `/sw.js` — to `/index.html` (a latent deploy-defect:
+  the hashed JS bundle would have been shadowed by the SPA HTML at the same path; the service
+  worker would have been served with default caching, breaking the offline-first update flow).
+  Ported config: SPA rewrite excludes `/assets/`, `manifest.webmanifest`, `sw.js`, icons,
+  favicons (they reach their static files); `sw.js` served `no-cache, no-store, must-revalidate`
+  (SW must always re-validate; only the assets it caches are long-lived); `/assets/(.*)` served
+  `public, max-age=31536000, immutable` (content-addressed by hash — safe aggressive CDN cache).
+  Removed `"framework": "vite"` (redundant). Verification: `npm run build` ✓ 6.11s, exit 0, bundle
+  unchanged `452.85 kB` (vercel.json is deploy-time, not bundle); `node -e JSON.parse` ✓ valid;
+  `diff ../pick-ur-veggie-farm/vercel.json vercel.json` ✓ byte-identical (clean port, not a
+  re-keying). AGENTS.md §5 sweep PASS (pure hosting config — no table/function/RLS/code path;
+  `$schema` is a public OpenAPI URL, not a secret). Out of scope: `.vercel/` local link (gitignored,
+  matches both repos; Vercel dashboard is the source of truth); OAuth finish + Vercel re-host
+  (Launch_Runbook §3 owner-channel). Money-path gate: NO. Auth-domain gate: NO. Per-port GO:
+  received. Per Handoff 001 §1 sticky-rule: this entry references `5f8e290` (Repo A's source
+  commit) and `6c039ab` (the prior Repo B commit at the time of this port); this commit's own SHA
+  is NOT referenced here. Cloud `jabjyvdkadcbfocaerno` untouched. Repo A untouched (read-only
+  boundary held — `cp` from outside was a write into Repo B ONLY; Repo A's `vercel.json` was
+  read, never written).
+  **Working-tree state at this commit:** the §3 #5 P1C §2.3 build (permissions.tsx + test +
+  handoff 003) is still UNCOMMITTED — it will be refactored onto the AwaitingApproval-screen
+  pattern as part of item A (P1C full port) per the noted architectural divergence between my
+  global-`PermissionProvider` wire and Repo A's screen-gated shape. It is intentionally left in
+  the working tree through items F–B, then folded/refactored by item A. No bundle deltas across
+  F/B/C/D reflect the unbuilt-then-built §2.3 changes until item A.

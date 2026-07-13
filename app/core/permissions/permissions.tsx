@@ -90,6 +90,27 @@ export function PermissionProvider({children}: {children: ReactNode}) {
     }
   }, [status, refresh]);
 
+  // P1C §2.3 + Launch_Runbook §2.3 (closes STATUS.md §3 Open issue #5):
+  // Re-derive the permission snapshot when the tab regains focus AND on a 15s interval while
+  // authenticated. Without this, a user who logs in with zero memberships (the C2 §3 "blind"
+  // state — an Active ERP identity awaiting admin approval) stays blind until they manually
+  // reload AFTER an admin approves them in another context. The re-derive reads the SAME
+  // governed data (user_branch_roles + role_permissions, RLS = own rows) the existing
+  // status-change refresh reads; no new server path, no new RLS aperture.
+  // Effect is keyed on `status` + `refresh` so listeners attach ONLY when authenticated and
+  // detach on anonymous / loading — no noise against a missing session.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
+    const intervalMs = 15000; // Launch_Runbook §2.3 "e.g. every 15s"; not user-configurable.
+    const id = window.setInterval(() => void refresh(), intervalMs);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.clearInterval(id);
+    };
+  }, [status, refresh]);
+
   const value = useMemo<PermissionValue>(
     () => ({loading, companyId, keys, has: (k) => keys.has(k), refresh}),
     [loading, companyId, keys, refresh],

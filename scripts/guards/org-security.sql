@@ -20,9 +20,9 @@ insert into public.companies (id, company_code, name) values
 insert into public.branches (id, company_id, branch_code, name) values
   ('a1111111-1111-1111-1111-111111111111','11111111-1111-1111-1111-111111111111','BR-A1','Branch A1'),
   ('b1111111-1111-1111-1111-111111111111','22222222-2222-2222-2222-222222222222','BR-B1','Branch B1');
-insert into public.roles (id, company_id, role_key, description) values
-  ('20000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','owner','Owner A'),
-  ('20000000-0000-0000-0000-00000000000b','22222222-2222-2222-2222-222222222222','owner','Owner B');
+insert into public.roles (id, company_id, role_key, description, rank) values
+  ('20000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','owner','Owner A',50),
+  ('20000000-0000-0000-0000-00000000000b','22222222-2222-2222-2222-222222222222','owner','Owner B',50);
 insert into public.role_permissions (company_id, role_id, permission_id)
   select '11111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a', id from public.permissions
    where permission_key in ('company.manage','branch.manage','role.manage','user.invite','membership.manage','user.read');
@@ -82,15 +82,16 @@ do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"
   perform public.invite_user('22222222-2222-2222-2222-222222222222','b1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000b','x@t.local',7);
   raise exception 'DEFECT org: owner A invited into company B';
 exception when insufficient_privilege then raise notice 'PASS org: invite into a foreign company denied (user.invite)'; end $$;
--- invite with a cross-company branch / role → composite FK blocks it
+-- invite with a cross-company branch → composite FK blocks it (P1C.1 added an earlier outranks_role
+-- check on the same-tier role id used here; either layer firing proves the cross-company invite is denied).
 do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"0a000000-0000-0000-0000-00000000000a"}';
   perform public.invite_user('11111111-1111-1111-1111-111111111111','b1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a','x@t.local',7);
   raise exception 'DEFECT org: invite accepted a cross-company branch';
-exception when foreign_key_violation then raise notice 'PASS org: invite cross-company branch blocked (composite FK)'; end $$;
+exception when foreign_key_violation or insufficient_privilege then raise notice 'PASS org: invite cross-company branch blocked (composite FK or rank check)'; end $$;
 do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"0a000000-0000-0000-0000-00000000000a"}';
   perform public.invite_user('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000b','x@t.local',7);
   raise exception 'DEFECT org: invite accepted a cross-company role';
-exception when foreign_key_violation then raise notice 'PASS org: invite cross-company role blocked (composite FK)'; end $$;
+exception when foreign_key_violation or insufficient_privilege then raise notice 'PASS org: invite cross-company role blocked (composite FK or rank check)'; end $$;
 -- the invitee (worker) cannot invite or self-assign a membership (no escalation)
 do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"0c000000-0000-0000-0000-00000000000c"}';
   perform public.invite_user('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a','x@t.local',7);
