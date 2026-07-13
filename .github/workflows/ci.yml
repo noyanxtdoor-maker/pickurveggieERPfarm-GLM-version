@@ -81,23 +81,29 @@ jobs:
       - name: Apply migrations (deterministic reset)
         run: npm run db:reset
 
-      - name: Wait for local Postgres to accept auth connections
+      - name: Wait for local Postgres to accept password-auth connections
         run: |
           # After `supabase start` + `db reset`, the local Postgres on :54522 needs
-          # a brief moment before it accepts psql password auth. Guards that run
-          # in that gap fail with "password authentication failed for user postgres"
-          # — which is a readiness race, NOT a real auth failure. Poll until pg_isready
-          # returns OK (max 30 seconds), so no guard hits a half-started Postgres.
+          # a brief moment before it accepts psql PASSWORD auth. `pg_isready` only
+          # probes TCP-level readiness (returning OK while the auth subsystem is
+          # still desaturating) — which left a gap where the first guard hit
+          # "password authentication failed for user postgres" even though
+          # pg_isready said ready. Cloud-check runs #25-#38 all fail at this gap.
+          #
+          # The probe here uses the SAME password-URL the guards use (so it tests
+          # exactly the auth path the guards will exercise), polling until a `select 1`
+          # actually succeeds with that password. Max 30s; abort cleanly if it never
+          # comes up.
           tries=0
-          until pg_isready -h 127.0.0.1 -p 54522 -U postgres -d postgres >/dev/null 2>&1 ; do
+          until psql "postgresql://postgres:***@127.0.0.1:54522/postgres" -v ON_ERROR_STOP=1 -c "select 1 as ready" >/dev/null 2>&1 ; do
             tries=$((tries + 1))
             if [ $tries -ge 30 ] ; then
-              echo "::error::local Postgres on :54522 not ready after 30s; aborting"
+              echo "::error::local Postgres on :54522 not accepting password auth after 30s; aborting"
               exit 1
             fi
             sleep 1
           done
-          echo "Postgres ready after ${tries}s"
+          echo "Postgres accepting password auth after ${tries}s"
 
       - name: Customers security tests (tenant isolation · customer.manage/read gates · non-money attribution · AR standing)
         run: bash scripts/ci/guard-retry.sh guard:customers
