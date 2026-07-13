@@ -81,6 +81,24 @@ jobs:
       - name: Apply migrations (deterministic reset)
         run: npm run db:reset
 
+      - name: Wait for local Postgres to accept auth connections
+        run: |
+          # After `supabase start` + `db reset`, the local Postgres on :54522 needs
+          # a brief moment before it accepts psql password auth. Guards that run
+          # in that gap fail with "password authentication failed for user postgres"
+          # — which is a readiness race, NOT a real auth failure. Poll until pg_isready
+          # returns OK (max 30 seconds), so no guard hits a half-started Postgres.
+          tries=0
+          until pg_isready -h 127.0.0.1 -p 54522 -U postgres -d postgres >/dev/null 2>&1 ; do
+            tries=$((tries + 1))
+            if [ $tries -ge 30 ] ; then
+              echo "::error::local Postgres on :54522 not ready after 30s; aborting"
+              exit 1
+            fi
+            sleep 1
+          done
+          echo "Postgres ready after ${tries}s"
+
       - name: Customers security tests (tenant isolation · customer.manage/read gates · non-money attribution · AR standing)
         run: bash scripts/ci/guard-retry.sh guard:customers
         env:
