@@ -25,7 +25,8 @@ The sibling **Repo A** (`../pick-ur-veggie-farm`, github `noyanxtdoor-maker/pick
 Team A = Fable 5 / ChatGPT 5.6 / Opus 4.8 / Sonnet 5) shares the lineage: **read theirs freely,
 NEVER write it.** Cross-repo code ports happen ONLY with the owner's explicit authorization, per port.
 // B: direction flipped — Repo A is the read-only sibling from here.
-Repo B's Supabase project: `jabjyvdkadcbfocaerno` (ap-northeast-1). // B: Repo B owns the original
+Repo B's Supabase project: `jabjyvdkadcbfocaerno` (ap-southeast-2 / Sydney — corrected 2026-07-14; the
+prior `ap-northeast-1` was stale and the pooler FQDNs under that region fail ENOTFOUND). // B: Repo B owns the original
 project; Repo A owns `aqhxhamdwmhcwxmebqbo`. **Never point either repo at the other's cloud project.**
 
 ## 1. Read in this order, every session
@@ -87,8 +88,12 @@ Repo-specific commands that differ from defaults:
 - CI self-check: `printf "protocol=https\nhost=github.com\n\n" | git credential fill` → take `password=`
   as a Bearer token → `GET api.github.com/repos/noyanxtdoor-maker/pickurveggieERPfarm-GLM-version/actions/runs?head_sha=<sha>`.
   // B: Repo B's GitHub path. Never print the token.
-- Cloud psql: session pooler `aws-0-ap-northeast-1.pooler.supabase.com:5432`, user
-  `postgres.jabjyvdkadcbfocaerno` (the direct `db.<ref>` host is IPv6-only). // B: Repo B's pooler user.
+- Cloud psql: the session-pooler FQDNs resolve to ENOTFOUND for this project (tenant-not-found);
+  the working path is the Supabase CLI — `npx supabase db push` (apply migrations) and
+  `npx supabase db query --linked -f <one-stmt>.sql` (read-back; multi-statement files fail, UNION ALL
+  into a single statement). User on the linked project is `postgres.jabjyvdkadcbfocaerno`.
+  // B: corrected 2026-07-14 — the prior `aws-0-ap-northeast-1.pooler.supabase.com:5432` line was stale
+  (wrong region + pooler does not resolve for this project).
   Password comes from the owner per session — never store it.
 - Deploy: `npx vercel deploy --prod` (Git auto-deploy stays OFF — the default production branch would
   ship the stale `main`). Working branch is `feature/phase-0-foundation`; never push to `main`/`develop`.
