@@ -43,22 +43,40 @@ if grep -qiE "DEFECT" "$TMP"; then
 fi
 
 # Transient signature: psql connection-level auth or connection-refused failure
-# on the 54522 local stack. Retry up to 2 more times (3 attempts total) with
-# progressively longer sleeps. CI run #36 hit a back-to-back connection hiccup
-# where the first retry ALSO failed within 3s — the runner's local supabase auth
-# capacity hadn't desaturated yet. Bumping to 2 retries + 8s/16s sleeps clears
-# it (~24s worst-case wait, still cheap) without papering over real regressions
-# — DEFECT-bearing output bailed at the earlier `if grep -qiE "DEFECT"` gate.
+# on the 54522 local stack. Two recovery modes, both gated on real-regression
+# detection (DEFECT bail-out already checked above):
+#   - If $GUARD_RESTART_ON_FLAKE is '1', the FIRST retry is preceded by a full
+#     local-stack stop/start/reset (gives the failing guard a freshly-booted
+#     DB with maximum auth capacity — addresses the cumulative-squeeze root
+#     cause, not just the symptom). Used by the empirically-flaky customers
+#     guard in ci.yml.
+#   - Otherwise (and as a fallback after the restart attempt), retry with
+#     progressively longer sleeps. CI run #36 showed the runner's auth
+#     capacity hadn't desaturated within 3s; run #37 showed 8s + 16s wasn't
+#     enough when the squeeze is bad. The restart path is the real cure;
+#     the long-sleep path is a backstop for transient hiccups that don't
+#     need a full restart.
 MAX_RETRIES=2
 SLEEP_FIRST=8
 attempt=1
 while [ $attempt -le $MAX_RETRIES ]; do
-  sleep_secs=$((SLEEP_FIRST * attempt))
-  echo "::warning::transient 54522 auth/conection flake on \`npm run $SCRIPT\`; retry $attempt/$MAX_RETRIES after ${sleep_secs}s" >&2
-  echo "--- previous-attempt output (kept for traceability) ---" >&2
-  cat "$TMP" >&2
-  echo "--- end previous-attempt output ---" >&2
-  sleep "$sleep_secs"
+  # On the first retry, if the caller asked for a fresh-DB restart, do it.
+  if [ "$attempt" -eq 1 ] && [ "${GUARD_RESTART_ON_FLAKE:-0}" = "1" ]; then
+    echo "::warning::transient 54522 auth/conection flake on \`npm run $SCRIPT\`; restarting local supabase + re-applying migrations before retry $attempt/$MAX_RETRIES" >&2
+    echo "--- previous-attempt output (kept for traceability) ---" >&2
+    cat "$TMP" >&2
+    echo "--- end previous-attempt output ---" >&2
+    npx supabase stop >/dev/null 2>&1 || true
+    npx supabase start >/dev/null 2>&1 || true
+    npm run db:reset >/dev/null 2>&1 || true
+  else
+    sleep_secs=$((SLEEP_FIRST * attempt))
+    echo "::warning::transient 54522 auth/conection flake on \`npm run $SCRIPT\`; retry $attempt/$MAX_RETRIES after ${sleep_secs}s" >&2
+    echo "--- previous-attempt output (kept for traceability) ---" >&2
+    cat "$TMP" >&2
+    echo "--- end previous-attempt output ---" >&2
+    sleep "$sleep_secs"
+  fi
   run_guard
   RC2=$?
   if [ $RC2 -eq 0 ]; then
