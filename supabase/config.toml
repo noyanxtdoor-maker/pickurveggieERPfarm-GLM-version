@@ -50,17 +50,6 @@ health_timeout = "2m"
 # The database major version to use. This has to be the same as your remote database's. Run `SHOW
 # server_version;` on the remote database to check.
 major_version = 17
-# Force the local-dev Postgres password to match the `***` literal embedded in every
-# `guard:*` script's psql URL in package.json (e.g. `psql "postgresql://postgres:***@..."`).
-# Without this line, newer Supabase CLI versions (2.107.0+) default the local password to the
-# literal string `postgres`, which made every `npm run guard:*` script fail on CI with
-# "password authentication failed for user postgres" — the root cause behind cloud-check
-# red runs #25 through #40 (16 consecutive failures). The password is intentionally weak
-# (`***`); that's fine because it only protects the throwaway local-dev Postgres that exists
-# for the duration of one CI job and is destroyed when the job ends. Verified locally:
-#   docker exec -e PGPASSWORD='***' ... psql -h db -U postgres → "password authentication failed"
-# which is what cloud-check also saw; setting postgres_password='***' flips that to PASS.
-postgres_password = "***"
 
 [db.pooler]
 enabled = false
