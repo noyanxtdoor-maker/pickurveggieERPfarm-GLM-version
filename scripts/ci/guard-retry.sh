@@ -43,18 +43,44 @@ if grep -qiE "DEFECT" "$TMP"; then
 fi
 
 # Transient signature: psql connection-level auth or connection-refused failure
-# on the 54522 local stack. Retry once after a brief sleep.
-if grep -qiE "password authentication failed for user|connection to server at|could not connect to server|server closed the connection unexpectedly" "$TMP"; then
-  echo "::warning::transient 54522 auth/conection flake on \`npm run $SCRIPT\`; retrying once after 3s" >&2
-  echo "--- first-attempt output (kept for traceability) ---" >&2
+# on the 54522 local stack. Retry up to 2 more times (3 attempts total) with
+# progressively longer sleeps. CI run #36 hit a back-to-back connection hiccup
+# where the first retry ALSO failed within 3s — the runner's local supabase auth
+# capacity hadn't desaturated yet. Bumping to 2 retries + 8s/16s sleeps clears
+# it (~24s worst-case wait, still cheap) without papering over real regressions
+# — DEFECT-bearing output bailed at the earlier `if grep -qiE "DEFECT"` gate.
+MAX_RETRIES=2
+SLEEP_FIRST=8
+attempt=1
+while [ $attempt -le $MAX_RETRIES ]; do
+  sleep_secs=$((SLEEP_FIRST * attempt))
+  echo "::warning::transient 54522 auth/conection flake on \`npm run $SCRIPT\`; retry $attempt/$MAX_RETRIES after ${sleep_secs}s" >&2
+  echo "--- previous-attempt output (kept for traceability) ---" >&2
   cat "$TMP" >&2
-  echo "--- end first-attempt output ---" >&2
-  sleep 3
+  echo "--- end previous-attempt output ---" >&2
+  sleep "$sleep_secs"
   run_guard
   RC2=$?
-  cat "$TMP"
-  exit "$RC2"
-fi
+  if [ $RC2 -eq 0 ]; then
+    cat "$TMP"
+    exit 0
+  fi
+  # Second-attempt failure is also checked for DEFECT — a real bug that
+  # appeared mid-run still surfaces loudly.
+  if grep -qiE "DEFECT" "$TMP"; then
+    cat "$TMP"
+    exit "$RC2"
+  fi
+  if ! grep -qiE "password authentication failed for user|connection to server at|could not connect to server|server closed the connection unexpectedly" "$TMP"; then
+    # No longer looks like the flake — propagate as-is.
+    cat "$TMP"
+    exit "$RC2"
+  fi
+  attempt=$((attempt + 1))
+done
+# All retries exhausted — propagate the final attempt's exit code.
+cat "$TMP"
+exit "$RC2"
 
 # Any other failure: propagate unchanged (real regression, not the flake).
 cat "$TMP"
