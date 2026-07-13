@@ -2,7 +2,7 @@
 // visual authority). White sidebar with PV logo + section labels + profile block; header with BRANCH LIVE chip,
 // session pill; farm-bg main stage. Tablet-first, ≥56px targets preserved.
 // BUG #7 (handoff 002 §7): the red top-bar Sign Out was removed 2026-07-12 — logout is now Settings → Session only.
-import {Suspense, useState} from 'react';
+import {Suspense, useEffect, useState} from 'react';
 import {NavLink, Outlet} from 'react-router-dom';
 import {useLiveQuery} from 'dexie-react-hooks';
 import {
@@ -29,6 +29,7 @@ import {usePermissions} from '../../core/permissions/permissions';
 import {useSession} from '../../core/auth/session';
 import {useDarkToggle, usePref} from '../../core/prefs/prefs';
 import {offlineDB} from '../../core/offline/db';
+import {MOCK_MODE} from '../../core/mock/mock';
 import type {PermissionKey} from '../../types/db';
 import {Loading, OfflineBanner} from '../feedback';
 import {cn} from '../ui';
@@ -253,8 +254,50 @@ function TopBar() {
   );
 }
 
+// P1C §2.3 (closes STATUS.md §3 Open issue #5) — the screen-gated auto-refresh, ported to Repo B's
+// shape from Repo A's app/components/layout/AppShell.tsx AwaitingApproval (read-only source by
+// owner GO 2026-07-13 "go all of them"). An authenticated identity with NO company membership is
+// "awaiting approval" (C2 §3 — RLS shows them nothing anyway; this screen says WHY instead of
+// rendering an empty shell). Real mode only — MOCK_MODE skips the gate (mock always has a company).
+// While this screen is mounted, it polls its OWN permission snapshot every 15s AND on window
+// focus, calling the SAME refresh() the global PermissionProvider exposes (no new server path,
+// no new RLS aperture — it re-reads user_branch_roles + role_permissions, RLS = own rows). The
+// moment an admin approves the user in another context, refresh() reads a non-null companyId,
+// AppShell re-renders, this component unmounts, and the interval + listener are cleaned up.
+// TODO(P1F): Repo A's AwaitingApproval differentiates "still pending" vs "Suspended/rejected" via
+// authApi.myAccountStatus(); Repo B has NOT yet built P1F (no myAccountStatus in authApi), so the
+// Suspended-rejection branch is omitted here. That branch rides IN with the P1F port (a separate
+// gated slice). Until then, a Suspended user in real mode will see the "awaiting approval" screen
+// indefinitely — acceptable because P1F is the next auth-domain port.
+export function AwaitingApproval() {
+  const {signOut, user} = useSession();
+  const {refresh} = usePermissions();
+  useEffect(() => {
+    const t = window.setInterval(() => void refresh(), 15000); // Launch_Runbook §2.3 "e.g. every 15s"
+    const onFocus = () => void refresh();
+    window.addEventListener('focus', onFocus);
+    return () => {window.clearInterval(t); window.removeEventListener('focus', onFocus);};
+  }, [refresh]);
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-farm-bg p-6">
+      <div className="w-full max-w-md rounded-2xl bg-farm-card p-8 text-center shadow-xl">
+        <h1 className="mb-2 text-xl font-extrabold text-farm-green">Almost in — awaiting approval</h1>
+        <p className="mb-1 text-sm text-farm-muted">Your account ({user?.email ?? 'signed in'}) was created successfully.</p>
+        <p className="mb-6 text-sm text-farm-muted">An admin now needs to assign you to a branch and role. This screen updates on its own the moment that happens — no need to refresh.</p>
+        <div className="flex justify-center gap-2">
+          <button onClick={() => void refresh()} className="rounded-xl bg-farm-green px-4 py-2 text-sm font-bold text-white">Check now</button>
+          <button onClick={() => void signOut()} className="rounded-xl border border-farm-accent px-4 py-2 text-sm font-bold text-farm-green">Sign out</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AppShell() {
   const {online, pending} = useSync();
+  const {companyId, loading} = usePermissions();
+  if (!MOCK_MODE && !loading && !companyId) return <AwaitingApproval />;
   return (
     <div className="flex h-screen bg-farm-bg text-farm-ink">
       <NavRail />

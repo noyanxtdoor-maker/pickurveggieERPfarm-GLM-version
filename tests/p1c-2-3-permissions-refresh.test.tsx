@@ -1,37 +1,35 @@
 // @vitest-environment jsdom
 // P1C §2.3 — post-approval membership auto-refresh (closes STATUS §3 Open issue #5).
 //
-// What this locks in:
-//   When an admin approves a pending signup (in another browser context) the newly-approved
-//   user's PermissionProvider still holds a stale empty-membership snapshot from when they
-//   first logged in with zero memberships. Today the user must manually reload/refresh to see
-//   their business data (the C2 §3 "blind" state persists past admin approval). The fix:
-//   PermissionProvider re-derives its snapshot periodically AND when the tab regains focus,
-//   so the moment a membership appears server-side the client picks it up — see
-//   Launch_Runbook §2.3 + STATUS §3 #5 + handoff 003.
+// What this locks in (REFACTORED 2026-07-13 to the screen-gated architecture):
+//   The auto-refresh wire (focus listener + 15s setInterval calling refresh()) NO LONGER lives in
+//   the global PermissionProvider — it was moved onto the <AwaitingApproval/> screen in
+//   app/components/layout/AppShell.tsx (item A of the multi-item port sequence; matches Repo A's
+//   shape per owner GO "go all of them"). This test now targets <AwaitingApproval/> directly.
 //
 // What this test asserts:
-//   1. Mount authenticated with zero memberships → keys empty (the bug baseline).
-//   2. Dispatching window focus triggers another refresh; a server-side approval (simulated
-//      by the supabase mock returning a membership + role_permission row) propagates the new
-//      key to the React snapshot WITHOUT a manual reload — the Bug #3 fix.
-//   3. Advancing fake timers past the 15s interval triggers another refresh (period wire).
-//   4. While status is anonymous, focus triggers no refresh (no session, no noise).
-//   5. While status is loading, focus triggers no refresh (the initial-load gate).
+//   1. AwaitingApproval mounts with zero memberships → renders the "Almost in" heading (baseline).
+//   2. Bug #3 fix: a window focus event triggers refresh(); a server-side approval (mock returns a
+//      membership + role_permission row) propagates the new key to the React snapshot — without a
+//      manual reload. This is the whole point of §2.3.
+//   3. Period wire: advancing fake timers past the 15s interval triggers refresh() (same propagation).
+//   4. AwaitingApproval's "Check now" button calls refresh() when clicked (the manual escape hatch).
+//   5. signOut is wired on the "Sign out" button (the existing escape hatch — kept from the prior shape).
 //
 // Strategy:
 //   - vi.mock @/app/core/supabase/client — loadSnapshot()'s queries return controlled rows.
-//   - vi.mock @/app/core/mock/mock — MOCK_MODE = false (the cloud branch of refresh is
-//     otherwise unreachable because vite.config.ts pins VITE_USE_MOCK=true globally — same
-//     limitation auth-session.test documents at L163; worked around by overriding the export).
-//   - vi.mock @/app/core/auth/session — useSession returns a controllable status. Avoids the
-//     real SessionProvider's async bootstrap (which gate-flips status through offlineDB.meta
-//     and would let keys populate through status-change, falsifying the focus assertion).
+//   - vi.mock @/app/core/mock/mock — MOCK_MODE = false (so PermissionProvider takes the cloud branch;
+//     otherwise unreachable because vite.config.ts pins VITE_USE_MOCK=true globally — same shim as
+//     auth-session.test.tsx L163).
+//   - vi.mock @/app/core/auth/session — useSession returns {status, signOut, user}; we drive status.
 //   - vi.useFakeTimers() to deterministically advance the 15s interval.
 //   - fake-indexeddb so PermissionProvider's offlineDB.meta.put cache step doesn't throw.
+//   - Render <PermissionProvider><AwaitingApproval/></PermissionProvider> — the screen reads refresh()
+//     from usePermissions() (provided by the wrapping PermissionProvider).
 import 'fake-indexeddb/auto';
 import {afterEach, beforeAll, beforeEach, describe, expect, it, vi} from 'vitest';
 import {act, cleanup, render, waitFor} from '@testing-library/react';
+import {fireEvent} from '@testing-library/react';
 import {offlineDB, purgeCache} from '@/app/core/offline/db';
 
 // ---------------------------------------------------------------------------
@@ -42,6 +40,8 @@ const {supabaseMock, sessionMock} = vi.hoisted(() => {
   let membershipsRows: Array<{company_id: string; role_id: string; assignment_status: string}> = [];
   let rolePermsRows: Array<{permissions: {permission_key: string}}> = [];
   let _status: 'loading' | 'authenticated' | 'anonymous' = 'loading';
+  let _signOutCalls = 0;
+  let _user: {email: string} | null = {email: 'pending@t.local'};
 
   // loadSnapshot() (app/core/permissions/permissions.tsx L21-49) builds exactly two promise chains:
   //   supabase.from('user_branch_roles').select('...').eq('assignment_status', 'Active') → {data, error}
@@ -75,6 +75,14 @@ const {supabaseMock, sessionMock} = vi.hoisted(() => {
       set: (s: typeof _status) => {
         _status = s;
       },
+      signOutCalls: () => _signOutCalls,
+      signOut: () => {
+        _signOutCalls += 1;
+      },
+      getUser: () => _user,
+      setUser: (u: {email: string} | null) => {
+        _user = u;
+      },
     },
   };
 });
@@ -90,12 +98,19 @@ vi.mock('@/app/core/mock/mock', () => ({
   seedMockData: () => Promise.resolve(),
 }));
 
-// Mock useSession to read our test-mutated status. The real PermissionProvider only calls
-// `useSession().status` so we don't need to mock SessionProvider — render PermissionProvider
-// directly without a session wrapper. useSession's value is computed fresh on every read so
-// when setStatus is called between renders, the next refresh cycle observes the new gate.
+// Mock useSession to drive status + capture signOut. AwaitingApproval reads {signOut, user};
+// PermissionProvider reads {status}. Both come from the same mock.
 vi.mock('@/app/core/auth/session', () => ({
-  useSession: () => ({status: sessionMock.get()}),
+  useSession: () => ({
+    status: sessionMock.get(),
+    signOut: () => {
+      sessionMock.signOut();
+      return Promise.resolve();
+    },
+    user: sessionMock.getUser(),
+  }),
+  SessionProvider: ({children}: {children: React.ReactNode}) => children,
+  useSync: () => ({online: true, pending: 0, syncing: false, triggerSync: () => Promise.resolve()}),
 }));
 
 // ---------------------------------------------------------------------------
@@ -144,6 +159,7 @@ beforeAll(() => {
 
 beforeEach(async () => {
   await purgeCache(); // clean IndexedDB between tests so the cached perm-snapshot doesn't bleed.
+  sessionMock.setUser({email: 'pending@t.local'});
 });
 
 afterEach(() => {
@@ -152,64 +168,58 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Render helper — sets the test's initial status + supabase rows, and renders the
-// PermissionProvider directly (no session wrapper, since useSession is mocked).
+// Render helper — PermissionProvider wraps AwaitingApproval so usePermissions() resolves refresh();
+// useSession is mocked to drive status. A Probe inside reads the permission snapshot for assertions.
 // ---------------------------------------------------------------------------
 import {PermissionProvider, usePermissions} from '@/app/core/permissions/permissions';
+import {AwaitingApproval} from '@/app/components/layout/AppShell';
 
-function renderWithStatus(
-  status: 'loading' | 'authenticated' | 'anonymous',
-  memberships: Array<{company_id: string; role_id: string; assignment_status: string}>,
-  rolePerms: Array<{permissions: {permission_key: string}}> = [],
-) {
+function renderScreen(status: 'loading' | 'authenticated' | 'anonymous', memberships: Array<{company_id: string; role_id: string; assignment_status: string}>, rolePerms: Array<{permissions: {permission_key: string}}> = []) {
   supabaseMock.setRows(memberships, rolePerms);
   sessionMock.set(status);
-  let snap: {keys: ReadonlySet<string>; companyId: string | null; loading: boolean} = {
-    keys: new Set<string>(),
-    companyId: null,
-    loading: true,
-  };
+  let snap: {keys: ReadonlySet<string>; companyId: string | null; loading: boolean} = {keys: new Set<string>(), companyId: null, loading: true};
   const Probe = () => {
     const v = usePermissions();
     snap = {keys: v.keys, companyId: v.companyId, loading: v.loading};
     return null;
   };
-  render(
+  const ui = (
     <PermissionProvider>
       <Probe />
-    </PermissionProvider>,
+      <AwaitingApproval />
+    </PermissionProvider>
   );
+  const r = render(ui);
   return {
+    ...r,
     getSnap: () => snap,
     setServerRows: supabaseMock.setRows,
     setStatus: (s: 'loading' | 'authenticated' | 'anonymous') => sessionMock.set(s),
+    signOutCalls: sessionMock.signOutCalls,
   };
 }
 
-describe('P1C §2.3 — PermissionProvider auto-refresh on focus + interval (closes STATUS §3 #5)', () => {
-  it('baseline: authenticated user with zero memberships has empty keys', async () => {
+describe('P1C §2.3 — AwaitingApproval screen-gated auto-refresh (closes STATUS §3 #5)', () => {
+  it('baseline: an authenticated user with zero memberships sees the "Almost in" awaiting screen', async () => {
     vi.useRealTimers();
-    const {getSnap} = renderWithStatus('authenticated', []);
-    await waitFor(() => expect(getSnap().loading).toBe(false), {timeout: 4000});
-    expect(getSnap().keys.size).toBe(0);
-    expect(getSnap().companyId).toBe(null);
+    const {getByText} = renderScreen('authenticated', []);
+    await waitFor(() => expect(getByText(/Almost in/i)).toBeDefined(), {timeout: 4000});
   });
 
   it('Bug #3 fix: window focus triggers refresh and a server-side approval propagates the new key without a manual reload', async () => {
     vi.useRealTimers();
-    // 1. Mount authenticated user with zero memberships (the pending state).
-    const {getSnap, setServerRows} = renderWithStatus('authenticated', []);
+    const {getSnap, setServerRows} = renderScreen('authenticated', []);
     await waitFor(() => expect(getSnap().loading).toBe(false), {timeout: 4000});
     expect(getSnap().keys.size).toBe(0);
 
-    // 2. Simulate admin approval: the server now has a membership + a role_permission row.
+    // Simulate admin approval: the server now has a membership + a role_permission row.
     setServerRows(
       [{company_id: 'comp-1', role_id: 'role-1', assignment_status: 'Active'}],
       [{permissions: {permission_key: 'pos.sell'}}],
     );
 
-    // 3. BEFORE the fix: focus did nothing. AFTER: focus → refresh() → loadSnapshot() re-reads
-    //    user_branch_roles + role_permissions → the React snapshot now has 'pos.sell'.
+    // BEFORE the fix: the user had to manually reload. AFTER: focus → refresh() → loadSnapshot()
+    // re-reads user_branch_roles + role_permissions → the React snapshot now has 'pos.sell'.
     await act(async () => {
       window.dispatchEvent(new FocusEvent('focus'));
     });
@@ -219,7 +229,7 @@ describe('P1C §2.3 — PermissionProvider auto-refresh on focus + interval (clo
 
   it('period wire: advancing fake timers past the 15s interval triggers refresh', async () => {
     vi.useFakeTimers({shouldAdvanceTime: true});
-    const {getSnap, setServerRows} = renderWithStatus('authenticated', []);
+    const {getSnap, setServerRows} = renderScreen('authenticated', []);
     // let the mount's initial async refresh settle (fake timers hold real-time promises back;
     // vitest's advanceTimersByTimeAsync flushes microtasks alongside the clock advance).
     await act(async () => {
@@ -241,32 +251,32 @@ describe('P1C §2.3 — PermissionProvider auto-refresh on focus + interval (clo
     await waitFor(() => expect(getSnap().keys.has('inventory.read')).toBe(true), {timeout: 4000});
   });
 
-  it('while status is anonymous, focus triggers no refresh (no session, no noise)', async () => {
+  it('the "Check now" button is wired and calls refresh() (manual escape hatch)', async () => {
     vi.useRealTimers();
-    const {getSnap, setServerRows} = renderWithStatus('anonymous', []);
-    await waitFor(() => expect(getSnap().loading).toBe(false), {timeout: 4000});
+    const {getByText, getSnap, setServerRows} = renderScreen('authenticated', []);
+    await waitFor(() => expect(getByText(/Almost in/i)).toBeDefined(), {timeout: 4000});
+    expect(getSnap().keys.size).toBe(0);
+
+    // admin approves in another context.
     setServerRows(
       [{company_id: 'comp-1', role_id: 'role-1', assignment_status: 'Active'}],
       [{permissions: {permission_key: 'pos.sell'}}],
     );
-    // Dispatch focus — should not refresh because status is anonymous.
+
+    // click "Check now" — should call refresh() and propagate the new key.
     await act(async () => {
-      window.dispatchEvent(new FocusEvent('focus'));
+      fireEvent.click(getByText(/Check now/i));
     });
-    expect(getSnap().keys.size).toBe(0);
+    await waitFor(() => expect(getSnap().keys.has('pos.sell')).toBe(true), {timeout: 4000});
   });
 
-  it('while status is loading, focus triggers no refresh (the initial-load gate)', async () => {
+  it('the "Sign out" button is wired and calls signOut (existing escape hatch)', async () => {
     vi.useRealTimers();
-    const {getSnap, setServerRows} = renderWithStatus('loading', []);
-    setServerRows(
-      [{company_id: 'comp-1', role_id: 'role-1', assignment_status: 'Active'}],
-      [{permissions: {permission_key: 'pos.sell'}}],
-    );
+    const {getByText, signOutCalls} = renderScreen('authenticated', []);
+    await waitFor(() => expect(getByText(/Sign out/i)).toBeDefined(), {timeout: 4000});
     await act(async () => {
-      window.dispatchEvent(new FocusEvent('focus'));
+      fireEvent.click(getByText(/Sign out/i));
     });
-    // No refresh was called → keys stay empty.
-    expect(getSnap().keys.size).toBe(0);
+    expect(signOutCalls()).toBeGreaterThanOrEqual(1);
   });
 });

@@ -82,43 +82,43 @@ jobs:
         run: npm run db:reset
 
       - name: DB guards (rls-enabled, tenant-ownership, audit-immutability)
-        run: npm run guard:db
+        run: bash scripts/ci/guard-retry.sh guard:db
 
       - name: Behavioral security tests (cross-tenant · permission · lifecycle · audit-immutability)
-        run: npm run guard:rls
+        run: bash scripts/ci/guard-retry.sh guard:rls
 
       - name: Bootstrap security tests (one-time · authorized · atomic · audited)
-        run: npm run guard:bootstrap
+        run: bash scripts/ci/guard-retry.sh guard:bootstrap
 
       - name: Organization security tests (authenticated writes · invitations · membership · isolation)
-        run: npm run guard:org
+        run: bash scripts/ci/guard-retry.sh guard:org
 
       - name: Crop security tests (company · branch isolation · permission · archived-usage · audit)
-        run: npm run guard:crop
+        run: bash scripts/ci/guard-retry.sh guard:crop
 
       - name: Inventory security tests (ledger-derived · tamper-proof · append-only · opening · isolation)
-        run: npm run guard:inventory
+        run: bash scripts/ci/guard-retry.sh guard:inventory
 
       - name: POS sale security tests (balanced posting · stock decrement · idempotency · no-oversell · price-authority)
-        run: npm run guard:pos
+        run: bash scripts/ci/guard-retry.sh guard:pos
 
       - name: Accounting security tests (balanced cash postings · void-not-delete · GL-reconciled statements)
-        run: npm run guard:accounting
+        run: bash scripts/ci/guard-retry.sh guard:accounting
 
       - name: Payroll security tests (balanced wage/advance postings · wage authority · derived balance · statements tie)
-        run: npm run guard:payroll
+        run: bash scripts/ci/guard-retry.sh guard:payroll
 
       - name: Scheduling security tests (tenant · branch isolation · permission gating · audit)
-        run: npm run guard:scheduling
+        run: bash scripts/ci/guard-retry.sh guard:scheduling
 
       - name: Projects security tests (tenant · branch isolation · task parent-scoping · permission gating · audit)
-        run: npm run guard:projects
+        run: bash scripts/ci/guard-retry.sh guard:projects
 
       - name: Customers security tests (tenant isolation · customer.manage/read gates · non-money attribution · AR standing)
-        run: npm run guard:customers
+        run: bash scripts/ci/guard-retry.sh guard:customers
 
       - name: Auth lifecycle security tests (P1A self-signup trigger · P1B requested-role queue · account recovery)
-        run: npm run guard:auth
+        run: bash scripts/ci/guard-retry.sh guard:auth
 
       - name: Schema-drift guard
         run: npm run guard:drift

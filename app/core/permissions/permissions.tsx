@@ -90,26 +90,17 @@ export function PermissionProvider({children}: {children: ReactNode}) {
     }
   }, [status, refresh]);
 
-  // P1C §2.3 + Launch_Runbook §2.3 (closes STATUS.md §3 Open issue #5):
-  // Re-derive the permission snapshot when the tab regains focus AND on a 15s interval while
-  // authenticated. Without this, a user who logs in with zero memberships (the C2 §3 "blind"
-  // state — an Active ERP identity awaiting admin approval) stays blind until they manually
-  // reload AFTER an admin approves them in another context. The re-derive reads the SAME
-  // governed data (user_branch_roles + role_permissions, RLS = own rows) the existing
-  // status-change refresh reads; no new server path, no new RLS aperture.
-  // Effect is keyed on `status` + `refresh` so listeners attach ONLY when authenticated and
-  // detach on anonymous / loading — no noise against a missing session.
-  useEffect(() => {
-    if (status !== 'authenticated') return;
-    const onFocus = () => void refresh();
-    window.addEventListener('focus', onFocus);
-    const intervalMs = 15000; // Launch_Runbook §2.3 "e.g. every 15s"; not user-configurable.
-    const id = window.setInterval(() => void refresh(), intervalMs);
-    return () => {
-      window.removeEventListener('focus', onFocus);
-      window.clearInterval(id);
-    };
-  }, [status, refresh]);
+  // P1C §2.3 post-approval auto-refresh (closes STATUS.md §3 Open issue #5):
+  // ARCHITECTURAL NOTE (refactored 2026-07-13 to Repo A's screen-gated shape — item A of the
+  // port sequence): the focus listener + 15s interval NO LONGER live here (global, running for
+  // every authenticated user forever). They live on the <AwaitingApproval/> screen in
+  // app/components/layout/AppShell.tsx, which mounts ONLY while a user is authenticated yet has
+  // no company membership (the C2 §3 "blind" state — an Active ERP identity awaiting admin
+  // approval). Once an admin approves them in another context and the screen's refresh() reads a
+  // non-null companyId, AppShell re-renders, <AwaitingApproval/> unmounts, and its interval +
+  // listener are cleaned up automatically. Scoped (only the awaiting population polls), self-
+  // cleaning (no permanent background poll for the approved tenant base), and visible UX.
+  // See handoff 003 §"architectural divergence — resolved" for the rationale.
 
   const value = useMemo<PermissionValue>(
     () => ({loading, companyId, keys, has: (k) => keys.has(k), refresh}),
