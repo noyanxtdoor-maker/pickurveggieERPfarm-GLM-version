@@ -52,7 +52,7 @@ export default function Dashboard() {
       .then((bs) => inventoryApi.lowStockCount(companyId, bs.map((b) => b.id)))
       .then(setLowStock)
       .catch(() => setLowStock(null));
-  }, [companyId]);
+  }, [companyId, refreshTick]); // refreshTick — manual tap-to-sync re-runs low-stock (item 4 fan-out)
 
   const loadReport = (cid: string) => {
     setReportError(null);
@@ -60,7 +60,7 @@ export default function Dashboard() {
   };
   useEffect(() => {
     if (companyId) loadReport(companyId);
-  }, [companyId]);
+  }, [companyId, refreshTick]); // refreshTick — manual tap-to-sync re-runs the sales report (item 4 fan-out)
 
   const summary = useMemo(() => (report ? summarizeSales(report.sales, new Date(), period) : null), [report, period]);
   const scopeHint = report?.source === 'canonical' ? 'your branches' : 'this device';
