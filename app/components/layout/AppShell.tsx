@@ -36,31 +36,48 @@ import {cn} from '../ui';
 
 // Operations (owner 2026-07-04) folds Schedules & Plans, Crops & Plans, and Project Checklists into one
 // entry with Accounting-style tabs — the nav stays short enough for tablets and the future mobile bar.
+// `perms`: any ONE of these grants visibility (undefined/empty = always visible to any signed-in member).
+// Payroll/Operations/Copilot/Reports/Settings stay unconditional: Payroll always has the M5C "My Payroll"
+// self-view even without payroll.read; Operations' Crops tab is member-readable regardless of role;
+// Reports is a placeholder; Copilot is informational-tier per CAP-VG1 §1; Settings is personal.
 const CORE_MODULES = [
-  {to: '/dashboard', label: 'Home Dashboard', icon: Activity},
-  {to: '/pos', label: 'Weigh Point-Of-Sale', icon: ShoppingCart},
-  {to: '/inventory', label: 'Stock Inventories', icon: Package},
-  {to: '/accounting', label: 'Automated Accounting', icon: Landmark},
-  {to: '/customers', label: 'Customers & Credit', icon: Contact},
-  {to: '/payroll', label: 'Salaries & Payroll', icon: Users2},
-  {to: '/operations', label: 'Operations', icon: ClipboardList},
-  {to: '/copilot', label: 'VeggieGenius', icon: Sparkles},
-  {to: '/reports', label: 'Reports', icon: BarChart3},
-  {to: '/settings', label: 'Settings Hub', icon: Settings},
-] as const;
+  {to: '/dashboard', label: 'Home Dashboard', icon: Activity, perms: undefined},
+  {to: '/pos', label: 'Weigh Point-Of-Sale', icon: ShoppingCart, perms: ['pos.sell']},
+  {to: '/inventory', label: 'Stock Inventories', icon: Package, perms: ['inventory.purchase', 'inventory.adjust', 'equipment.manage']},
+  {to: '/accounting', label: 'Automated Accounting', icon: Landmark, perms: ['accounting.read']},
+  {to: '/customers', label: 'Customers & Credit', icon: Contact, perms: ['customer.read']},
+  {to: '/payroll', label: 'Salaries & Payroll', icon: Users2, perms: undefined},
+  {to: '/operations', label: 'Operations', icon: ClipboardList, perms: undefined},
+  {to: '/copilot', label: 'VeggieGenius', icon: Sparkles, perms: undefined}, // CAP-VG1: advisory copilot (read-only, C7 §11)
+  {to: '/reports', label: 'Reports', icon: BarChart3, perms: undefined},
+  {to: '/settings', label: 'Settings Hub', icon: Settings, perms: undefined},
+] as const satisfies ReadonlyArray<{to: string; label: string; icon: typeof Activity; perms: readonly PermissionKey[] | undefined}>;
+
+const ORG_LINK = {
+  to: '/organization', label: 'Approvals & Roles', icon: UserCheck,
+  perms: ['membership.read', 'membership.manage', 'company.manage', 'branch.manage', 'role.manage'],
+} as const satisfies {to: string; label: string; icon: typeof UserCheck; perms: readonly PermissionKey[]};
+
+// Permission-gated nav (P1C+ bonus, 2026-07-15): hide any top-level module the signed-in user has no key
+// for. RLS already blocks the underlying reads; this just stops the dead click + empty-screen flash.
+function visibleNav<T extends {perms?: readonly PermissionKey[]}>(items: readonly T[], has: (k: PermissionKey) => boolean): T[] {
+  return items.filter((m) => !m.perms || m.perms.length === 0 || m.perms.some(has));
+}
 
 // Mobile bottom bar (owner 2026-07-04): 4 user-customizable shortcut slots + a fixed "More" sheet for
 // everything else. Preference is per-device (usePref), validated against the real module list.
-const ALL_NAV = [...CORE_MODULES, {to: '/organization', label: 'Approvals & Roles', icon: UserCheck}] as const;
+const ALL_NAV = [...CORE_MODULES, ORG_LINK] as const;
 const MOBILE_NAV_DEFAULT = '/dashboard,/pos,/inventory,/operations';
 
 function MobileNav() {
+  const {has} = usePermissions();
   const [slotsPref, setSlotsPref] = usePref('mobile_nav', MOBILE_NAV_DEFAULT);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [customizing, setCustomizing] = useState(false);
-  const validPaths = ALL_NAV.map((m) => m.to as string);
+  const nav = visibleNav(ALL_NAV, has);
+  const validPaths = nav.map((m) => m.to as string);
   const slots = slotsPref.split(',').filter((p) => validPaths.includes(p)).slice(0, 4);
-  const slotItems = slots.map((p) => ALL_NAV.find((m) => m.to === p)!);
+  const slotItems = slots.map((p) => nav.find((m) => m.to === p)!);
 
   const toggleSlot = (to: string) => {
     if (slots.includes(to)) setSlotsPref(slots.filter((s) => s !== to).join(','));
@@ -109,7 +126,7 @@ function MobileNav() {
             </div>
             {customizing ? <p className="mb-3 text-[11px] text-farm-muted">Tap a section to pin or unpin it from your bottom bar. Your choice is saved on this device.</p> : null}
             <div className="grid grid-cols-3 gap-2">
-              {ALL_NAV.map((m) => {
+              {nav.map((m) => {
                 const Icon = m.icon;
                 const pinned = slots.includes(m.to);
                 if (customizing) {
@@ -158,7 +175,10 @@ function navClass(isActive: boolean): string {
 
 function NavRail() {
   const {user} = useSession();
+  const {has} = usePermissions();
   const name = (user?.email ?? 'operator').split('@')[0] ?? 'operator';
+  const modules = visibleNav(CORE_MODULES, has);
+  const showOrgLink = ORG_LINK.perms.some(has);
   return (
     <aside className="hidden w-64 flex-col justify-between border-r border-farm-accent-soft bg-farm-card p-5 md:flex">
       <div className="space-y-5">
@@ -171,7 +191,7 @@ function NavRail() {
         </div>
         <nav className="space-y-1.5" aria-label="Main">
           <span className="block border-b border-farm-bg px-3 pb-1 text-[10px] font-black uppercase tracking-wider text-farm-muted">Core Operational Features</span>
-          {CORE_MODULES.map((m) => {
+          {modules.map((m) => {
             const Icon = m.icon;
             return (
               <NavLink key={m.to} to={m.to} className={({isActive}) => navClass(isActive)}>
@@ -179,10 +199,14 @@ function NavRail() {
               </NavLink>
             );
           })}
-          <span className="block border-b border-farm-bg px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-wider text-farm-muted">User Administration</span>
-          <NavLink to="/organization" className={({isActive}) => navClass(isActive)}>
-            <UserCheck className="h-4 w-4 shrink-0" aria-hidden /> Approvals &amp; Roles
-          </NavLink>
+          {showOrgLink ? (
+            <>
+              <span className="block border-b border-farm-bg px-3 pb-1 pt-4 text-[10px] font-black uppercase tracking-wider text-farm-muted">User Administration</span>
+              <NavLink to="/organization" className={({isActive}) => navClass(isActive)}>
+                <UserCheck className="h-4 w-4 shrink-0" aria-hidden /> Approvals & Roles
+              </NavLink>
+            </>
+          ) : null}
         </nav>
       </div>
       <div className="space-y-3 border-t border-farm-accent-soft pt-4">

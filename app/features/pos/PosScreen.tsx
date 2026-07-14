@@ -9,6 +9,7 @@ import {AlertCircle, Banknote, CloudOff, Download, Lock, Printer, Scale, Setting
 import {offlineDB} from '../../core/offline/db';
 import {usePermissions} from '../../core/permissions/permissions';
 import {useSync} from '../../core/offline/sync';
+import {hydrateBranches} from '../../core/offline/hydrate';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
@@ -37,6 +38,9 @@ export default function PosScreen() {
   useEffect(() => {
     if (!branchId && branches && branches.length > 0) setBranchId(branches[0]!.id);
   }, [branches, branchId]);
+  // Hydrate branches into Dexie on mount (a pos.sell-only role may never open the Branches/Approvals
+  // screens that warm this cache — without this, the branch picker stays empty on a fresh device).
+  useEffect(() => {if (companyId) hydrateBranches(companyId);}, [companyId]);
 
   const [products, setProducts] = useState<Product[] | null>(null);
   const [stock, setStock] = useState<FinishedGood[]>([]);

@@ -9,10 +9,12 @@ import App from '@/app/App';
 describe('V3 application renders', () => {
   it('mounts providers + router and shows the login screen (mock mode)', async () => {
     render(<App />);
-    // P1 split-panel login: brand headline on the marketing panel + the two auth tabs.
+    // P1 redesign (2026-07-15): dark theme + Email/Username field; the submit button is now "Sign In"
+    // (was "Log in to ERP") — so /sign in/i now matches BOTH the tab toggle AND the submit button (use All).
     await waitFor(() => expect(screen.getAllByText(/Pick Ur Veggie/i).length).toBeGreaterThan(0), {timeout: 4000});
-    expect(screen.getByRole('button', {name: /sign in/i})).toBeDefined();
+    expect(screen.getAllByRole('button', {name: /sign in/i}).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', {name: /create pos account/i})).toBeDefined();
-    expect(screen.getByRole('button', {name: /log in to erp/i})).toBeDefined();
+    // The redesign's defining element: the sign-in form accepts email OR username.
+    expect(screen.getByLabelText(/email \/ username/i)).toBeDefined();
   });
 });

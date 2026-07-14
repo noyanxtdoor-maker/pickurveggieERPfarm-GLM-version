@@ -9,6 +9,7 @@ import {Activity, ArrowRight, Building2, Clock3, Mailbox, Plus, ShoppingCart, Tr
 import {Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
 import {supabase} from '../core/supabase/client';
 import {offlineDB} from '../core/offline/db';
+import {hydrateBranches} from '../core/offline/hydrate';
 import {usePermissions} from '../core/permissions/permissions';
 import {useSync} from '../core/offline/sync';
 import {MOCK_MODE} from '../core/mock/mock';
@@ -46,6 +47,7 @@ export default function Dashboard() {
   const [lowStock, setLowStock] = useState<number | null>(null);
   useEffect(() => {
     if (!companyId) return;
+    hydrateBranches(companyId); // warm the cache so the low-stock count below doesn't read empty on a fresh device
     offlineDB.branches.where('company_id').equals(companyId).toArray()
       .then((bs) => inventoryApi.lowStockCount(companyId, bs.map((b) => b.id)))
       .then(setLowStock)

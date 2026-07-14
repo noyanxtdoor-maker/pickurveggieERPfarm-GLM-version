@@ -8,6 +8,7 @@ import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
 import {AlertTriangle, ClipboardList, FileText, Hammer, Minus, Package, Plus, ReceiptText, RefreshCw, ShieldAlert, ShoppingBag, X} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
+import {hydrateBranches} from '../../core/offline/hydrate';
 import {usePermissions} from '../../core/permissions/permissions';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {EmptyState, Skeleton, useToast} from '../../components/feedback';
@@ -32,6 +33,9 @@ export default function InventoryScreen() {
   useEffect(() => {
     if (!branchId && branches && branches.length > 0) setBranchId(branches[0]!.id);
   }, [branches, branchId]);
+  // Hydrate branches into Dexie on mount (an inventory-only role may never open the Branches/Approvals
+  // screens that warm this cache — without this, the branch picker stays empty on a fresh device).
+  useEffect(() => {if (companyId) hydrateBranches(companyId);}, [companyId]);
 
   const [tab, setTab] = useState<'consumables' | 'equipment' | 'purchases'>('consumables');
   const [categories, setCategories] = useState<ItemCategory[]>([]);

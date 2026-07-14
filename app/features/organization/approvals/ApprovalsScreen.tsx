@@ -12,6 +12,7 @@ import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
 import {Clock3, ShieldCheck, UserCog, X} from 'lucide-react';
 import {offlineDB} from '../../../core/offline/db';
+import {hydrateBranches} from '../../../core/offline/hydrate';
 import {supabase} from '../../../core/supabase/client';
 import {usePermissions} from '../../../core/permissions/permissions';
 import {useSync} from '../../../core/offline/sync';
@@ -65,8 +66,7 @@ export default function ApprovalsScreen() {
     // Branches/Roles screens have been visited — hydrate it here so approval works standalone (found by the
     // first live-cloud E2E: the approve dialog had zero options).
     if (!MOCK_MODE && (typeof navigator === 'undefined' || navigator.onLine)) {
-      void supabase.from('branches').select('*').eq('company_id', companyId)
-        .then(({data}) => data && offlineDB.branches.bulkPut(data as never[]));
+      hydrateBranches(companyId);
       void supabase.from('roles').select('*').eq('company_id', companyId)
         .then(({data}) => data && offlineDB.roles.bulkPut(data as never[]));
     }
