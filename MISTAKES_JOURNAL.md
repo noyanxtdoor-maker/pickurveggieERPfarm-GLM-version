@@ -16,7 +16,19 @@
 
 # MISTAKES_JOURNAL.md — Plain-English log of wasted-token detours
 
-## #3 (2026-07-15) — "Item 1 done" claimed on tsc/vitest/build only; CI caught a DB-guard miss
+## Mistake #4 (2026-07-15): False "every X wired" coverage claim from a one-side grep
+
+Context: After shipping item 4 (manual tap-to-sync refreshTick fan-out), I claimed "every data screen got wired" based on a per-file `grep refreshTick` matrix that returned Y for 13 files. I never proved the NEGATIVE — that NO data screen lacked refreshTick. The owner pushed back: "check ALL of Repo B's data screens got wired, not just the [obvious ones]." Enumerating all 20 routes systematically found 8 more screens (Inventory, Accounting, Payroll×2, Schedules, Projects, Customers, CopilotPanel, CropDashboard) with `useEffect(reload, [reload])` whose deps array had NO refreshTick — over 60% of data screens. Tsc/vitest/build were all green throughout (the missed-wiring doesn't break tests, it silently breaks a runtime UX), so the verification battery didn't catch it.
+
+Rule: "every X has property Y" is only proven by enumerating X exhaustively AND showing each has Y. A grep that returns hits for SOME X is NOT coverage proof — it's a hope. Always do the enumeration pass (find every screen/route/table/function) and check each, then publish the full matrix as evidence. A named-but-not-counted "every" is a process smell.
+
+## Mistake #5 (2026-07-15): Patch-mode=replace mutated the wrong line shape — verify tsc after EACH patch in a batch
+
+Context: While rapidly applying the refreshTick wiring to 8 screens, one of my patches used `new_string="\n  useSync()\n"` as a placeholder for a 3-step refactor (add import → add destructure → update deps). It actually DELETED `useEffect(reload, [reload]);` instead of leaving it for the next patch. I caught it with tsc before commit + immediately reverted. But had I not run tsc or had CI not been a gate, broken code would have shipped.
+
+Rule: When using patch-mode=replace for a multi-step refactor (import + destructure + deps), do NOT use placeholder one-line replacements that delete existing structure. Plan each patch so it applies one atomic change to the final shape. After every patch batch (not just at the end), run tsc — a 5-second check that catches a deleted line or a wrong closure shape before the next patch builds on top of it.
+
+## Mistake #3 (2026-07-15): "Item 1 done" claimed on tsc/vitest/build only — CI caught a DB-guard miss
 
 **What I did:** Built the Invitations retire (item 1) — migration revoking EXECUTE on
 `accept_invitation()` + `invite_user()`, plus a new `invitations-retired.sql` guard. Ran
