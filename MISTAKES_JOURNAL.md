@@ -14,9 +14,46 @@
 > paper over a misdiagnosis with a softer story — the whole point is to RECORD
 > the wasted detour so the next model skips it.
 
----
+# MISTAKES_JOURNAL.md — Plain-English log of wasted-token detours
 
-## Mistake #2 — Two Sessions Diagnosing a "Vercel Platform Incident" That Was a Misspelled Domain
+## #3 (2026-07-15) — "Item 1 done" claimed on tsc/vitest/build only; CI caught a DB-guard miss
+
+**What I did:** Built the Invitations retire (item 1) — migration revoking EXECUTE on
+`accept_invitation()` + `invite_user()`, plus a new `invitations-retired.sql` guard. Ran
+`tsc --noEmit` (clean), `vitest run` (105/105), `npm run build` (clean) and claimed DONE.
+Committed + pushed as `92853d1`.
+
+**What I missed:** The existing `scripts/guards/org-security.sql` still asserted the
+*happy path* — it called `accept_invitation('token')` expecting it to succeed and verify
+the invitee got the role. After my EXECUTE revoke, that call throws `permission denied`
+(not `raise_exception`), no handler catches it, the guard fails. The static Montana
+battery I ran locally DOES include the DB guards but they need a live DB — and the docker
+stack was down. I didn't have docker GO, didn't run the guards against a local `db reset`'d
+DB, and shipped anyway. CI run #48 went RED on the "Organization security tests —
+invitations" step within ~1 minute.
+
+**The rule I broke:** AGENTS.md §2 — "DB-touching items need guard battery before AND
+after." I treated tsc/vitest/build + my new guard file existing as proof of done. That's
+the same class of error as "should work" hand-waving.
+
+**The fix:** Wrapped every remaining `accept_invitation` / `invite_user` call in
+`org-security.sql` to expect `insufficient_privilege` after the revoke — flipping from
+"happy-path succeeds" to "RPC retired at the EXECUTE boundary." Committed as `37451d5`.
+CI run #49 → GREEN.
+
+**Process rules for future models:**
+1. **DB-touching = DB guard battery is a gate, not a check.** If the change touches any
+   function/table the existing guards exercise, you must `(a) start docker, (b) npx
+   supabase db reset, (c) run scripts/guards/*.sql` — OR hold the "done" claim and queue
+   "needs docker GO for the guard battery" as a blocker. Don't claim done on tsc-only.
+2. **A new guard file does not absolve the change of updating existing guards that exercise
+   the same code path.** Always grep `scripts/guards/` for the function/table you just
+   revoked/changed — if a sibling guard still asserts the old behavior, flip it to assert
+   the new behavior (or document why the existing assertion no longer applies).
+3. **CI failure on your commit = your job to debug.** Don't relocate, don't blame flake.
+   Pull the failing step's log, fix the real cause, push the fix, re-verify CI went green.
+
+## #2 (2026-07-14) — Two Sessions Diagnosing a "Vercel Platform Incident" That Was a Misspelled Domain
 
 **What happened:** Over two sessions (one cut short by a power outage, the next
 continuing it), I spent hours investigating a persistent `404
