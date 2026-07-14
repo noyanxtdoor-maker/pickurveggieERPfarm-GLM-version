@@ -33,31 +33,27 @@ insert into public.user_branch_roles (user_id, company_id, branch_id, role_id) v
   ('10000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a'),
   ('10000000-0000-0000-0000-00000000000b','22222222-2222-2222-2222-222222222222','b1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000b');
 
--- ── HAPPY PATH: owner manages org → invites → invitee accepts → isolated; + single-use replay ──
-do $$ declare v_role uuid; v_token text; v_membership uuid; n int; begin
-  set local role authenticated; set local request.jwt.claims = '{"sub":"0a000000-0000-0000-0000-00000000000a"}';  -- owner A
-  insert into public.roles (company_id, role_key, description)
-    values ('11111111-1111-1111-1111-111111111111','worker','Worker') returning id into v_role;            -- role.manage
-  insert into public.role_permissions (company_id, role_id, permission_id)
-    select '11111111-1111-1111-1111-111111111111', v_role, id from public.permissions where permission_key='user.read';
-  insert into public.branches (company_id, branch_code, name)
-    values ('11111111-1111-1111-1111-111111111111','BR-A2','Branch A2');                                    -- branch.manage
-  update public.companies set name='Company A (edited)' where id='11111111-1111-1111-1111-111111111111';    -- company.manage
-  v_token := public.invite_user('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111', v_role, 'invitee@t.local', 7);
-  set local role authenticated; set local request.jwt.claims = '{"sub":"0c000000-0000-0000-0000-00000000000c"}';  -- invitee
-  v_membership := public.accept_invitation(v_token);
-  begin
-    perform public.accept_invitation(v_token);                                                              -- replay
-    raise exception 'DEFECT org: invitation token was replayed';
-  exception when raise_exception then raise notice 'PASS org: token replay denied (single-use)'; end;
-  if (select count(*) from public.companies) <> 1 then raise exception 'DEFECT org: invitee sees % companies', (select count(*) from public.companies); end if;
-  if (select count(*) from public.companies where id='22222222-2222-2222-2222-222222222222') <> 0 then raise exception 'DEFECT org: invitee sees company B'; end if;
-  if not public.has_permission('11111111-1111-1111-1111-111111111111','user.read') then raise exception 'DEFECT org: invitee lacks granted worker permission'; end if;
-  if public.has_permission('11111111-1111-1111-1111-111111111111','membership.manage') then raise exception 'DEFECT org: invitee escalated to membership.manage'; end if;
-  set local role postgres;
-  select count(*) into n from public.user_branch_roles where id = v_membership; if n<>1 then raise exception 'DEFECT org: membership not created'; end if;
-  raise notice 'PASS org: workflow — owner managed org + invited; invitee accepted, isolated to company A with exactly the worker permission set';
-end $$;
+-- ── P1I (2026-07-14): Invitations RETIRED ──
+-- accept_invitation() has a real bug: it grants the role to whichever auth.uid() is CURRENTLY SIGNED IN,
+-- not the intended invitee — an admin testing their own copy-invite-link self-grants the role. Repo A
+-- retired the feature 2026-07-13; Repo B mirrors the call here. Migration 20260714210000_p1i_revokes
+-- EXECUTE on invite_user() + accept_invitation() from authenticated (keeps functions + data; never deletes).
+-- The new security property: BOTH functions are now denied at the EXECUTE boundary — every authenticated
+-- call throws insufficient_privilege, regardless of role. (Functions still callable as postgres for audit.)
+do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"0a000000-0000-0000-0000-00000000000a"}';  -- owner A
+  -- any role can now no longer invite — even the company owner. The grant was revoked, period.
+  perform public.invite_user('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a','invitee@t.local',7);
+  raise exception 'DEFECT org: P1I leak — owner A could still call invite_user() after retire';
+exception when insufficient_privilege then raise notice 'PASS org: P1I — invite_user() retired (EXECUTE revoked from authenticated)'; end $$;
+do $$ begin set local role postgres;  -- seed a token as superuser (EXECUTE bypass) so the invitee EXISTS to test
+  insert into public.invitations (company_id, branch_id, role_id, token, invited_by, expires_at)
+    values ('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a','p1i-retired-token','10000000-0000-0000-0000-00000000000a', now() + interval '7 days');
+  set local role authenticated; set local request.jwt.claims='{"sub":"0c000000-0000-0000-0000-00000000000c"}';  -- invitee
+  -- ── the original security bug is now CLOSED: the invitee cannot grant themselves a role because the
+  --    accept_invitation RPC is no longer reachable by any authenticated user. Even though the invite exists.
+  perform public.accept_invitation('p1i-retired-token');
+  raise exception 'DEFECT org: P1I leak — invitee could still call accept_invitation() after retire';
+exception when insufficient_privilege then raise notice 'PASS org: P1I — accept_invitation() retired (EXECUTE revoked from authenticated; original self-grant bug closed at the boundary)'; end $$;
 
 -- ── ATTACKS ──
 -- cross-company branch creation
@@ -102,14 +98,17 @@ do $$ begin set local role authenticated; set local request.jwt.claims='{"sub":"
     values ('10000000-0000-0000-0000-00000000000a','11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a');
   raise exception 'DEFECT org: worker self-assigned a membership';
 exception when insufficient_privilege then raise notice 'PASS org: worker cannot assign memberships (no membership.manage)'; end $$;
--- expired invitation cannot be accepted
+-- P1I (2026-07-14): expired invitation cannot be accepted — now BECAUSE accept_invitation() is retired
+-- (every authenticated call throws insufficient_privilege; the function-level revoke is the security
+-- boundary, not the per-token expiry check). The original coverage still holds: an expired token can
+-- never become a membership.
 do $$ begin set local role postgres;
   insert into public.invitations (company_id, branch_id, role_id, token, invited_by, expires_at)
     values ('11111111-1111-1111-1111-111111111111','a1111111-1111-1111-1111-111111111111','20000000-0000-0000-0000-00000000000a','expired-token-xyz','10000000-0000-0000-0000-00000000000a', now() - interval '1 day');
   set local role authenticated; set local request.jwt.claims='{"sub":"0c000000-0000-0000-0000-00000000000c"}';
   perform public.accept_invitation('expired-token-xyz');
-  raise exception 'DEFECT org: expired invitation accepted';
-exception when raise_exception then raise notice 'PASS org: expired invitation denied'; end $$;
+  raise exception 'DEFECT org: P1I leak — an expired token was accept_invitation() reachable after retire';
+exception when insufficient_privilege then raise notice 'PASS org: P1I — expired token denied (accept_invitation() retired at EXECUTE boundary)'; end $$;
 -- membership management: owner A may suspend a membership in A (positive); cannot touch B (0 rows)
 do $$ declare n int; begin set local role authenticated; set local request.jwt.claims='{"sub":"0a000000-0000-0000-0000-00000000000a"}';
   update public.user_branch_roles set assignment_status='Expired'
