@@ -28,6 +28,14 @@ Context: While rapidly applying the refreshTick wiring to 8 screens, one of my p
 
 Rule: When using patch-mode=replace for a multi-step refactor (import + destructure + deps), do NOT use placeholder one-line replacements that delete existing structure. Plan each patch so it applies one atomic change to the final shape. After every patch batch (not just at the end), run tsc — a 5-second check that catches a deleted line or a wrong closure shape before the next patch builds on top of it.
 
+## Mistake #6 (2026-07-15): SECURITY DEFINER audit that skipped the GRANT line — false alarm retract
+
+Context: While reviewing Repo A's `seed_standard_roles(p_company_id)` for the cross-tenant gap pattern Repo A's own `p1e` migration established, I flagged it as a missing branch-membership check ("any caller could re-seed another company's role tiers"). The flag was WRONG. The function is granted `service_role` only (revoke from public/anon/authenticated; grant execute to service_role). Service-role-only functions are NOT user-reachable via the public RPC endpoint — the entry-point check pattern p1e applied to its 7 functions is needed precisely because they are granted to `authenticated` (broad user reachability), NOT because they are SECURITY DEFINER per se. I over-read the "SECURITY DEFINER + takes a company parameter" trigger and skipped the grant line, jumping to the cross-tenant-writable conclusion.
+
+Rule: A SECURITY DEFINER function taking a company parameter is only a cross-tenant risk if it is granted to a USER-reachable role (anon, authenticated). ALWAYS read the GRANT/REVOKE statement alongside the function body before raising the cross-tenant flag. The pattern from AGENTS §5 ("Can a user of company B name company A's ids and get effects?") presupposes a user CAN reach the function — verify that reach first via the GRANT line, then audit the body. Otherwise the finding is a false alarm that wastes the cross-vendor reviewer's time.
+
+Same-shape lesson as #4: "looks vulnerable, isn't" is symmetric to "looks wired, isn't" — both come from checking one dimension (body / function signature) and skipping the other dimension (GRANT line / deps array). Audit both or retract.
+
 ## Mistake #3 (2026-07-15): "Item 1 done" claimed on tsc/vitest/build only — CI caught a DB-guard miss
 
 **What I did:** Built the Invitations retire (item 1) — migration revoking EXECUTE on
