@@ -25,12 +25,12 @@ const branchFetch = async (c: string): Promise<Branch[]> => {
 
 export default function TemplatesScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const canManage = has('crop.manage');
-  const {items, loaded} = useSyncedCrop(offlineDB.plantingTemplates, companyId, cropApi.templates.fetch);
-  const {items: profiles} = useSyncedCrop(offlineDB.cropProfiles, companyId, cropApi.profiles.fetch);
-  const {items: branches} = useSyncedCrop(offlineDB.branches, companyId, branchFetch);
+  const {items, loaded} = useSyncedCrop(offlineDB.plantingTemplates, companyId, cropApi.templates.fetch, refreshTick);
+  const {items: profiles} = useSyncedCrop(offlineDB.cropProfiles, companyId, cropApi.profiles.fetch, refreshTick);
+  const {items: branches} = useSyncedCrop(offlineDB.branches, companyId, branchFetch, refreshTick);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [query, setQuery] = useState('');
   const profName = useMemo(() => new Map((profiles ?? []).map((p) => [p.id, p.name])), [profiles]);

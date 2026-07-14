@@ -206,7 +206,7 @@ function NavRail() {
 }
 
 function TopBar() {
-  const {online, pending, syncing, triggerSync} = useSync();
+  const {online, pending, syncing, manualSync} = useSync();
   const {companyId} = usePermissions();
   const [farmName] = usePref('farm_display_name');
   const [terminalId] = usePref('terminal_id', 'Terminal A — Main Gate');
@@ -234,9 +234,9 @@ function TopBar() {
           {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
         </button>
         <button
-          onClick={triggerSync}
+          onClick={manualSync}
           className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold', online ? 'text-farm-green' : 'text-farm-warn')}
-          title={online ? 'Online — tap to sync' : 'Offline'}
+          title={online ? 'Online — tap to sync + refresh' : 'Offline'}
         >
           {online ? <Wifi size={18} aria-hidden /> : <CloudOff size={18} aria-hidden />}
           {syncing ? <RefreshCw size={16} className="animate-spin" aria-hidden /> : null}
@@ -323,7 +323,7 @@ const ORG_TABS: Array<{to: string; label: string; perm?: PermissionKey}> = [
   {to: '/organization/company', label: 'Company'},
   {to: '/organization/branches', label: 'Branches'},
   {to: '/organization/roles', label: 'Roles'},
-  {to: '/organization/invitations', label: 'Invitations', perm: 'user.invite'},
+  // P1I: 'Invitations' tab removed — Invitations retired 2026-07-14 (accept_invitation auth-uid bug).
   {to: '/organization/members', label: 'Members', perm: 'membership.read'},
 ];
 

@@ -16,6 +16,60 @@
 
 ---
 
+## Mistake #2 — Two Sessions Diagnosing a "Vercel Platform Incident" That Was a Misspelled Domain
+
+**What happened:** Over two sessions (one cut short by a power outage, the next
+continuing it), I spent hours investigating a persistent `404
+DEPLOYMENT_NOT_FOUND` on the production alias, and wrote up a full platform-level
+diagnosis: alias corruption, `public=False` deployment gating, SSO redirects,
+`readySubstate=PROMOTED` disagreeing with the edge, even a "stale/broken
+promotion" theory. With the owner's GO, I ran a fresh `npx vercel deploy --prod`
+to fix it. None of it was real. The actual production domain was always serving
+HTTP 200. I was curling the wrong hostname.
+
+**The symptom that misled me:** The 404 looked like a *platform* problem, not a
+404-of-a-missing-resource. `DEPLOYMENT_NOT_FOUND` is a scary-sounding Vercel
+error, and the Vercel API — when I queried the domain list vs the single-domain
+GET vs the v6 vs the v13 deployment endpoints — returned fields that seemed to
+contradict each other (`alias=None` in one list, alias-present in another). That
+apparent API self-contradiction made "platform-side state corruption" feel like a
+reasonable hypothesis, so I kept reasoning up the ladder of platform complexity
+instead of checking the one thing that was wrong.
+
+**The truth:** I was testing `pickurgeggie-erp-glm.vercel.app` — note "geggie".
+The real domain is `pickurveggie-erp-glm.vercel.app` — "veggie", same spelling as
+the repo name and the Vercel project name. `curl -sI https://pickurveggie-erp-glm.vercel.app/`
+returns `HTTP 200` on the first try, root and `/login` both. The "API
+self-contradiction" was just different endpoints responding to a domain name that
+doesn't exist as a registered deployment — some return empty/null fields, some
+return "not found", none of it was about the *real* deployment being broken.
+There was no platform incident. The fresh `--prod` redeploy I ran (with the
+owner's GO) was unnecessary — it just minted a perfectly good new deployment of a
+build that was already live and serving 200.
+
+**The rule that would have stopped me:** When a resource 404s in a way that doesn't
+match its own status fields (READY but not found, verified but not found, PROMOTED
+but 404), **rule out an exact-string mismatch on the hostname FIRST** — compare
+it letter-by-letter against a primary source of truth (`.vercel/project.json`
+`projectName`, the Vercel project name in the dashboard or `/v9/projects` API,
+the production alias the deploy command itself printed: "▲ Aliased https://<name>.vercel.app").
+Exact-string mismatch (spelling, casing, hyphens) is a cheaper, more common
+explanation than platform inconsistency and must be ruled out first, not last.
+Before reasoning about SSO gating, `public=False`, alias corruption, or promotion
+failures, print the string you're curling and the string from `project.json` next
+to each other and look at them.
+
+**Process addendum (owner 2026-07-14):** I also silently self-patched the
+`vercel-and-oauth-deployment-gotchas.md` skill reference mid-session with a §3
+encoding the wrong "stale/broken promotion" lesson. That calcified a bad
+diagnosis into long-term memory. Going forward, do not auto-persist
+self-improvement edits to skill files without flagging the diff to the owner
+first — surface the diff in the session report, don't just write it silently. The
+bad §3 has been replaced with the correct domain-string-mismatch lesson; the
+misspelled-domain reference in §2 has been removed.
+
+---
+
 ## Mistake #1 — The 20-Run CI Streak (the wrong-password misdiagnosis)
 
 **What happened:** The cloud quality check (GitHub Actions) failed 20 runs in a

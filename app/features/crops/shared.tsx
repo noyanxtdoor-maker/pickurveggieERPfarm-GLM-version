@@ -43,6 +43,7 @@ export function useSyncedCrop<T extends Scoped>(
   table: Table<T, string>,
   companyId: string | null,
   fetcher: (companyId: string) => Promise<T[]>,
+  refreshTick?: number,
 ): {items: T[] | undefined; loaded: boolean; reload: () => void} {
   const [loaded, setLoaded] = useState(false);
   const items = useLiveQuery(async () => (companyId ? table.where('company_id').equals(companyId).toArray() : []), [companyId]);
@@ -50,7 +51,7 @@ export function useSyncedCrop<T extends Scoped>(
     if (!companyId) return;
     fetcher(companyId).then((rows) => table.bulkPut(rows)).catch(() => undefined).finally(() => setLoaded(true));
   }, [companyId, fetcher, table]);
-  useEffect(reload, [reload]);
+  useEffect(reload, [reload, refreshTick]);
   return {items, loaded, reload};
 }
 

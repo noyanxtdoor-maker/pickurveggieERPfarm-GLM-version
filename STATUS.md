@@ -48,7 +48,7 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
 | `vite build` | ✅ ok |
 | Cloud migration list (`supabase migration list --linked`) | ✅ **25 / 25 local = remote** (P1A+P1B pushed 2026-07-11) |
 | Cloud auth signup trigger (P1A `on_auth_user_created`) | ✅ verified — signup 200, identity created, email_confirmation required (expected) |
-| Vercel deployment (`https://pickurveggie-erp-glm.vercel.app/`) | ✅ 200 OK (2026-07-11) |
+| Vercel deployment (`https://pickurveggie-erp-glm.vercel.app/`) | ✅ 200 OK (re-verified 2026-07-14 — root + `/login` both HTTP 200 to anonymous curl; the prior "404 DEPLOYMENT_NOT_FOUND" conclusion was a misspelled-domain error, see §4 2026-07-14 entry) |
 | Latest CI run on the feature branch (`a327cc9`, HEAD) | ✅ green (install · tsc · test · build · DB guards · secret scan) — CI for `13ee8c1` not yet audited (owner pastes Actions URL) |
 | CI runs a browser? | ❌ no — E2E is manual, mock-mode only |
 
@@ -704,3 +704,25 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   global-`PermissionProvider` wire and Repo A's screen-gated shape. It is intentionally left in
   the working tree through items F–B, then folded/refactored by item A. No bundle deltas across
   F/B/C/D reflect the unbuilt-then-built §2.3 changes until item A.
+- **2026-07-14 (wrong-domain diagnosis — TOKEN-WASTE INCIDENT, logged per MISTAKES_JOURNAL habit)** —
+  Two sessions spent diagnosing a "persistent Vercel 404 `DEPLOYMENT_NOT_FOUND`" on what was claimed
+  to be the production alias, reasoning at length about `public=False` deployment gating, SSO
+  redirects, `readySubstate=PROMOTED` vs edge disagreement, even running a fresh `npx vercel deploy
+  --prod` (with owner GO) — all against the misspelled domain `pickurgeggie-erp-glm.vercel.app`
+  ("geggie"). The actual production alias is `pickurveggie-erp-glm.vercel.app` ("veggie" — same
+  spelling as the repo and project name). `curl -sI https://pickurveggie-erp-glm.vercel.app/` returned
+  `HTTP 200` immediately. Every platform-state conclusion (alias corruption, broken promotion, SSO
+  gating, `public=False`) was a hallucination built on a misspelled hostname; there was NO Vercel
+  platform incident. The fresh `npx vercel deploy --prod` was therefore unnecessary — it produced a
+  valid new deployment (`dpl_7qwrNh64Z6GHkvoxBCrpkRP9L19g`, READY, aliased) of a build that was
+  already live and serving 200. Lesson (encoded into the `owner-gated-tracks` skill's
+  `vercel-and-oauth-deployment-gotchas.md` §3): when a resource 404s in a way that doesn't match its
+  own status fields, rule out an exact-string mismatch on the hostname (spelling/casing/hyphens)
+  against `.vercel/project.json` and the deploy command's "▲ Aliased" output BEFORE reasoning about
+  platform-level state. STATUS.md §1 Vercel row re-verified 200 OK today against the correct domain.
+  Process correction also recorded: do NOT auto-persist self-improvement edits to skill files
+  mid-session without flagging the diff to the owner first. No code, migrations, or guards changed;
+  the only repo write this session is this STATUS.md correction. The misspelled-domain paragraph that
+  was silently written into `vercel-and-oauth-deployment-gotchas.md` §2's "Real example" last session
+  has been removed, and the §3 "stale/broken promotion" lesson that encoded the bad diagnosis was
+  replaced with the correct domain-string-mismatch lesson.

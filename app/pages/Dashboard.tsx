@@ -5,12 +5,14 @@
 import {useEffect, useMemo, useState} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {useLiveQuery} from 'dexie-react-hooks';
-import {Activity, ArrowRight, Building2, Mailbox, Plus, ShoppingCart, TrendingUp, UserPlus} from 'lucide-react';
+import {Activity, ArrowRight, Building2, Clock3, Mailbox, Plus, ShoppingCart, TrendingUp} from 'lucide-react';
 import {Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis} from 'recharts';
 import {supabase} from '../core/supabase/client';
 import {offlineDB} from '../core/offline/db';
 import {usePermissions} from '../core/permissions/permissions';
+import {useSync} from '../core/offline/sync';
 import {MOCK_MODE} from '../core/mock/mock';
+import {authApi} from '../features/auth/api';
 import {posApi} from '../features/pos/api';
 import {inventoryApi} from '../features/inventory/api';
 import {summarizeSales, type PeriodDays, type SalesReport} from '../features/pos/report';
@@ -26,9 +28,13 @@ const PERIODS: Array<{days: PeriodDays; label: string}> = [
 
 export default function Dashboard() {
   const {companyId, has} = usePermissions();
+  const {refreshTick} = useSync();
   const navigate = useNavigate();
   const [members, setMembers] = useState<number | null>(null);
-  const [pending, setPending] = useState<number | null>(null);
+  // P1I (2026-07-14): repurposed from "pending invites" (Invitations retired) to the live pending-approvals
+  // count — the self-signup queue (authApi.listPendingUsers, same data ApprovalsScreen reads). Gated by
+  // membership.read/membership.manage, not the retired user.invite.
+  const [pendingApprovals, setPendingApprovals] = useState<number | null>(null);
   const [report, setReport] = useState<SalesReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodDays>(7);
@@ -66,18 +72,20 @@ export default function Dashboard() {
     if (!companyId) return;
     if (MOCK_MODE) {
       offlineDB.memberships.where('company_id').equals(companyId).count().then(setMembers);
-      offlineDB.invitations.where('company_id').equals(companyId).filter((i) => i.status === 'Pending').count().then(setPending);
+      // P1I: count pending approvals (mock — same MOCK_PENDING authApi.listPendingUsers returns).
+      authApi.listPendingUsers().then((rows) => setPendingApprovals(rows.length)).then(undefined, () => setPendingApprovals(null));
       return;
     }
     if (has('membership.read')) {
       supabase.from('user_branch_roles').select('*', {count: 'exact', head: true}).eq('company_id', companyId)
         .then(({count}) => setMembers(count ?? 0)).then(undefined, () => setMembers(null));
     }
-    if (has('user.invite')) {
-      supabase.from('invitations').select('*', {count: 'exact', head: true}).eq('company_id', companyId).eq('status', 'Pending')
-        .then(({count}) => setPending(count ?? 0)).then(undefined, () => setPending(null));
+    // P1I: repurposed from pending-invites to pending-approvals (gated by membership.read, the queue's
+    // own access gate — not user.invite, which retired with Invitations).
+    if (has('membership.read')) {
+      authApi.listPendingUsers().then((rows) => setPendingApprovals(rows.length)).then(undefined, () => setPendingApprovals(null));
     }
-  }, [companyId, has]);
+  }, [companyId, has, refreshTick]);
 
   return (
     <div>
@@ -255,7 +263,7 @@ export default function Dashboard() {
         <StatCard label="Company" value={company ? <StatusBadge status={company.status} /> : '—'} hint={company?.company_code} />
         <StatCard label="Branches" value={branchCount ?? 0} hint={company?.base_currency_code} />
         <StatCard label="Members" value={has('membership.read') ? (members ?? '—') : '—'} hint={has('membership.read') ? undefined : 'No access'} />
-        <StatCard label="Pending invites" value={has('user.invite') ? (pending ?? '—') : '—'} hint={has('user.invite') ? undefined : 'No access'} />
+        <StatCard label="Pending approvals" value={has('membership.read') ? (pendingApprovals ?? '—') : '—'} hint={has('membership.read') ? (pendingApprovals ? 'awaiting review' : undefined) : 'No access'} />
       </div>
 
       <Card>
@@ -264,11 +272,13 @@ export default function Dashboard() {
           <ActionTile label="Weigh a Sale" icon={<ShoppingCart size={28} aria-hidden />} disabled={!has('pos.sell')} onClick={() => navigate('/pos')} />
           <ActionTile label="Open Company" icon={<Building2 size={28} aria-hidden />} onClick={() => navigate('/organization/company')} />
           <ActionTile label="Create Branch" icon={<Plus size={28} aria-hidden />} disabled={!has('branch.manage')} onClick={() => navigate('/organization/branches')} />
-          <ActionTile label="Invite User" icon={<UserPlus size={28} aria-hidden />} disabled={!has('user.invite')} onClick={() => navigate('/organization/invitations')} />
+          {/* P1I (2026-07-14): "Invite User" tile repurposed to "Review approvals" — Invitations retired;
+              the live onboarding path is self-signup → Approvals queue (membership.read-gated). */}
+          <ActionTile label="Review approvals" icon={<Clock3 size={28} aria-hidden />} disabled={!has('membership.read')} onClick={() => navigate('/organization/approvals')} />
         </div>
       </Card>
 
-      {!has('membership.read') && !has('user.invite') ? (
+      {!has('membership.read') ? (
         <p className="mt-6 flex items-center gap-2 text-base text-farm-muted"><Mailbox size={18} aria-hidden /> Some widgets are hidden because your role doesn't grant access.</p>
       ) : null}
     </div>

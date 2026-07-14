@@ -15,11 +15,11 @@ import {cropApi} from './api';
 
 export default function VarietiesScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const canManage = has('crop.manage');
-  const {items, loaded} = useSyncedCrop(offlineDB.cropVarieties, companyId, cropApi.varieties.fetch);
-  const {items: categories} = useSyncedCrop(offlineDB.cropCategories, companyId, cropApi.categories.fetch);
+  const {items, loaded} = useSyncedCrop(offlineDB.cropVarieties, companyId, cropApi.varieties.fetch, refreshTick);
+  const {items: categories} = useSyncedCrop(offlineDB.cropCategories, companyId, cropApi.categories.fetch, refreshTick);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [query, setQuery] = useState('');
   const catName = useMemo(() => new Map((categories ?? []).map((c) => [c.id, c.name])), [categories]);

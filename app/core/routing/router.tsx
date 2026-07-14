@@ -8,7 +8,6 @@ import {AppShell, OrganizationLayout} from '../../components/layout/AppShell';
 import {Loading} from '../../components/feedback';
 import Login from '../../pages/Login';
 import ResetPassword from '../../pages/ResetPassword';
-import AcceptInvitation from '../../pages/AcceptInvitation';
 import Placeholder from '../../pages/Placeholder';
 import type {PermissionKey} from '../../types/db';
 
@@ -16,7 +15,9 @@ const Dashboard = lazy(() => import('../../pages/Dashboard'));
 const CompanyScreen = lazy(() => import('../../features/organization/company/company'));
 const BranchesScreen = lazy(() => import('../../features/organization/branches/branches'));
 const RolesScreen = lazy(() => import('../../features/organization/roles/roles'));
-const InvitationsScreen = lazy(() => import('../../features/organization/invitations/invitations'));
+// P1I (Repo B, 2026-07-14): Invitations retired (owner decision, mirroring Repo A's 202607-13 call).
+// accept_invitation() had a live auth-uid-vs-intended-recipient mismatch bug; revoked, not deleted.
+// The InvitationsScreen and /accept route are removed; self-signup + Approvals covers onboarding.
 const MembersScreen = lazy(() => import('../../features/organization/memberships/memberships'));
 const ApprovalsScreen = lazy(() => import('../../features/organization/approvals/ApprovalsScreen'));
 const PosScreen = lazy(() => import('../../features/pos/PosScreen'));
@@ -53,7 +54,7 @@ function RequirePermission({perm, children}: {perm: PermissionKey; children: Rea
 export const router = createBrowserRouter([
   {path: '/login', element: <Login />},
   {path: '/auth/reset', element: <ResetPassword />},
-  {path: '/accept', element: <RequireAuth><AcceptInvitation /></RequireAuth>},
+  // P1I: /accept removed — Invitations retired 2026-07-14 (accept_invitation auth-uid bug).
   {
     path: '/',
     element: (
@@ -74,7 +75,7 @@ export const router = createBrowserRouter([
           {path: 'company', element: <CompanyScreen />},
           {path: 'branches', element: <BranchesScreen />},
           {path: 'roles', element: <RolesScreen />},
-          {path: 'invitations', element: <RequirePermission perm="user.invite"><InvitationsScreen /></RequirePermission>},
+          // P1I: /organization/invitations removed — Invitations retired 2026-07-14.
           {path: 'members', element: <RequirePermission perm="membership.read"><MembersScreen /></RequirePermission>},
         ],
       },

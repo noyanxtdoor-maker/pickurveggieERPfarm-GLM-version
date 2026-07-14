@@ -55,7 +55,7 @@ const rolesApi = {
 
 export default function RolesScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [loaded, setLoaded] = useState(false);
   const canManage = has('role.manage');
@@ -64,7 +64,7 @@ export default function RolesScreen() {
   useEffect(() => {
     if (!companyId) return;
     rolesApi.fetch(companyId).then((r) => offlineDB.roles.bulkPut(r)).catch(() => undefined).finally(() => setLoaded(true));
-  }, [companyId]);
+  }, [companyId, refreshTick]);
 
   const current = selected && selected !== 'new' ? roles?.find((r) => r.id === selected) : undefined;
 

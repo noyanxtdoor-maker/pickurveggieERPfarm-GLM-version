@@ -66,7 +66,7 @@ export const membershipsApi = {
 
 export default function MembersScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const [rows, setRows] = useState<MemberRow[] | null>(null);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const canManage = has('membership.manage');
@@ -75,7 +75,7 @@ export default function MembersScreen() {
   const roles = useLiveQuery(async () => (companyId ? offlineDB.roles.where('company_id').equals(companyId).toArray() : []), [companyId]);
 
   const reload = () => {if (companyId) membershipsApi.fetch(companyId).then(setRows).catch(() => setRows([]));};
-  useEffect(reload, [companyId]);
+  useEffect(reload, [companyId, refreshTick]);
 
   const current = selected && selected !== 'new' ? rows?.find((r) => r.id === selected) : undefined;
 
@@ -87,7 +87,7 @@ export default function MembersScreen() {
           {rows === null ? (
             <Skeleton />
           ) : rows.length === 0 ? (
-            <EmptyState title="No members yet" hint="Assign a role to a user, or invite someone new from the Invitations tab." />
+            <EmptyState title="No members yet" hint="Assign a role to a user. New members can self-sign up and land in the Approvals queue for you to appoint." />
           ) : (
             <ul className="divide-y divide-farm-accent-soft">
               {rows.map((m) => (

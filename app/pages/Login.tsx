@@ -13,6 +13,18 @@ import {MOCK_MODE} from '../core/mock/mock';
 import {Button} from '../components/ui';
 import {Field, TextInput, zodResolver} from '../components/forms';
 
+// Google OAuth provider icon (P1A Google scaffold; used on BOTH login + signup tabs — item 3).
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 48 48" className="h-4 w-4" aria-hidden>
+      <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.7-.4-3.5z" />
+      <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.6 15.9 18.9 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 6.1 29.6 4 24 4 16.3 4 9.7 8.3 6.3 14.7z" />
+      <path fill="#4CAF50" d="M24 44c5.5 0 10.4-2.1 14.1-5.6l-6.5-5.5C29.6 34.7 26.9 36 24 36c-5.3 0-9.7-3.3-11.3-8l-6.5 5C9.6 39.6 16.3 44 24 44z" />
+      <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.3-4.1 5.7l6.5 5.5C41.5 36 44 30.5 44 24c0-1.3-.1-2.7-.4-3.5z" />
+    </svg>
+  );
+}
+
 type Tab = 'signin' | 'signup';
 
 const signinSchema = z.object({email: z.string().email('Enter a valid email'), password: z.string().min(1, 'Required')});
@@ -130,7 +142,7 @@ export default function Login() {
               {!MOCK_MODE ? (
                 <Button type="button" variant="secondary" className="w-full" disabled={!configured}
                   onClick={async () => {setError(null); const r = await signInWithGoogle(); if (r.error) setError(r.error.includes('not enabled') || r.error.includes('Unsupported') ? 'Google sign-in is not enabled yet — the owner switches it on in the Supabase dashboard (Phase_1_OAuth_Setup.md).' : r.error);}}>
-                  Continue with Google
+                  <GoogleIcon /> Continue with Google
                 </Button>
               ) : null}
               <button type="button" className="w-full text-sm text-farm-muted underline" onClick={() => {setForgot(true); setError(null); setNotice(null);}}>Forgot password?</button>
@@ -187,6 +199,16 @@ export default function Login() {
               </div>
               {error ? <p className="text-sm font-medium text-red-700" role="alert">{error}</p> : null}
               <Button type="submit" className="w-full uppercase tracking-wider" disabled={su.formState.isSubmitting || (!configured && !MOCK_MODE)}>Register POS Account</Button>
+              {/* Item 3 (2026-07-14): Google sign-in on the SIGNUP tab too, not just login — same hook, same
+                  graceful "not enabled" message. A Google signup creates the auth identity + triggers
+                  handle_new_auth_user() the same way email signup does; the account lands in the Approvals
+                  queue pending appointment (no self-granted role). */}
+              {!MOCK_MODE ? (
+                <Button type="button" variant="secondary" className="w-full" disabled={!configured}
+                  onClick={async () => {setError(null); const r = await signInWithGoogle(); if (r.error) setError(r.error.includes('not enabled') || r.error.includes('Unsupported') ? 'Google sign-in is not enabled yet — the owner switches it on in the Supabase dashboard (Phase_1_OAuth_Setup.md).' : r.error);}}>
+                  <GoogleIcon /> Continue with Google
+                </Button>
+              ) : null}
             </form>
           )}
 

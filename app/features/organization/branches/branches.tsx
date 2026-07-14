@@ -38,7 +38,7 @@ const branchesApi = {
 
 export default function BranchesScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export default function BranchesScreen() {
       .then(() => setError(null))
       .catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoaded(true));
-  }, [companyId]);
+  }, [companyId, refreshTick]);
 
   const current = selected && selected !== 'new' ? branches?.find((b) => b.id === selected) : undefined;
 

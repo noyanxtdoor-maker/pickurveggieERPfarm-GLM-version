@@ -42,7 +42,7 @@ const ROLE_AUTHORITY: Record<string, string> = {
 export default function ApprovalsScreen() {
   const {companyId, has} = usePermissions();
   const {notify} = useToast();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const canManage = has('membership.manage');
 
   const roles = useLiveQuery(async () => (companyId ? offlineDB.roles.where('company_id').equals(companyId).filter((r) => r.status === 'Active').toArray() : []), [companyId]);
@@ -71,7 +71,7 @@ export default function ApprovalsScreen() {
         .then(({data}) => data && offlineDB.roles.bulkPut(data as never[]));
     }
   };
-  useEffect(reload, [companyId, canManage]);
+  useEffect(reload, [companyId, canManage, refreshTick]);
 
   async function approvePending() {
     if (!companyId || !approveTarget || !apBranch || !apRole) return;
@@ -145,7 +145,7 @@ export default function ApprovalsScreen() {
         ) : pending === null ? (
           <Skeleton rows={1} />
         ) : pending.length === 0 ? (
-          <p className="py-4 text-sm text-farm-muted">No pending registration requests. New members can also join via <Link to="/organization/invitations" className="font-bold text-farm-green underline">Invitations</Link>.</p>
+          <p className="py-4 text-sm text-farm-muted">No pending registration requests. New members self-sign up at the login screen and appear here for you to appoint.</p>
         ) : (
           <ul className="divide-y divide-farm-accent-soft">
             {pending.map((p) => (

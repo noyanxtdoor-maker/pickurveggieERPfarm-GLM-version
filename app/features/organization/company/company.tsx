@@ -34,7 +34,7 @@ const companyApi = {
 
 export default function CompanyScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const canManage = has('company.manage');
   const company = useLiveQuery(async () => (companyId ? offlineDB.companies.get(companyId) : undefined), [companyId]);
@@ -42,7 +42,7 @@ export default function CompanyScreen() {
   useEffect(() => {
     if (!companyId) return;
     companyApi.fetch(companyId).then((c) => {if (c) void offlineDB.companies.put(c);}).catch(() => undefined);
-  }, [companyId]);
+  }, [companyId, refreshTick]);
 
   if (!company) return <Card><Skeleton rows={3} /></Card>;
   return <CompanyForm company={company} canManage={canManage} onSaved={triggerSync} notify={notify} />;

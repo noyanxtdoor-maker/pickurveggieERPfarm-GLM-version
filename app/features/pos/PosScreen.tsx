@@ -25,7 +25,7 @@ const lineAmount = (l: SaleLineInput) => (l.weight_kg === null ? l.unit_price : 
 
 export default function PosScreen() {
   const {companyId, has} = usePermissions();
-  const {online, triggerSync} = useSync();
+  const {online, triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const canSell = has('pos.sell');
   const canSettle = has('pos.settle');
@@ -45,7 +45,7 @@ export default function PosScreen() {
     posApi.fetchProducts(companyId).then(setProducts).catch(() => setProducts([]));
     posApi.fetchStock(companyId, branchId).then(setStock).catch(() => setStock([]));
   }, [companyId, branchId]);
-  useEffect(reload, [reload]);
+  useEffect(reload, [reload, refreshTick]);
 
   const [selected, setSelected] = useState<Product | null>(null);
   const [weight, setWeight] = useState('');

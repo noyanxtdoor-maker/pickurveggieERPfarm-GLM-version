@@ -15,10 +15,10 @@ import {cropApi} from './api';
 
 export default function CategoriesScreen() {
   const {companyId, has} = usePermissions();
-  const {triggerSync} = useSync();
+  const {triggerSync, refreshTick} = useSync();
   const {notify} = useToast();
   const canManage = has('crop.manage');
-  const {items, loaded} = useSyncedCrop(offlineDB.cropCategories, companyId, cropApi.categories.fetch);
+  const {items, loaded} = useSyncedCrop(offlineDB.cropCategories, companyId, cropApi.categories.fetch, refreshTick);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const [query, setQuery] = useState('');
   const current = selected && selected !== 'new' ? items?.find((c) => c.id === selected) : undefined;
