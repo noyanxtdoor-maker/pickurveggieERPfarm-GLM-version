@@ -11,14 +11,14 @@ import {offlineDB} from '../offline/db';
 import {uuidv7} from '../offline/uuidv7';
 import type {OutboxItem} from '../offline/db';
 import type {SendResult, Sender} from '../offline/queue';
-import type {Branch, Company, FinishedGood, Invitation, Membership, Permission, PermissionKey, Product, Role} from '../../types/db';
+import type {Branch, Company, FinishedGood, Membership, Permission, PermissionKey, Product, Role} from '../../types/db';
 
 export const MOCK_MODE: boolean =
   !isSupabaseConfigured || (import.meta.env.VITE_USE_MOCK as string | undefined) === 'true';
 
 const ALL_KEYS: PermissionKey[] = [
   'user.read', 'membership.read', 'audit.read', 'company.manage', 'branch.manage',
-  'role.manage', 'user.invite', 'membership.manage', 'crop.manage',
+  'role.manage', 'membership.manage', 'crop.manage',
   'product.manage', 'inventory.opening', 'inventory.adjust', 'pos.sell',
   'pos.settle', 'pos.void', 'cash.session', 'inventory.purchase', 'equipment.manage',
   'accounting.read', 'accounting.manage', 'payroll.read', 'payroll.manage',
@@ -49,7 +49,6 @@ export async function seedMockData(): Promise<void> {
   await offlineDB.meta.put({key: 'perm-snapshot', value: {companyId: DEMO.companyId, keys: ALL_KEYS}});
   if (await offlineDB.companies.get(DEMO.companyId)) return; // data already seeded
   const now = new Date().toISOString();
-  const expires = new Date(Date.now() + 7 * 86_400_000).toISOString();
 
   const company: Company = {id: DEMO.companyId, company_code: 'DEMO-CO', name: 'Demo Farm Co.', base_currency_code: 'PHP', status: 'Active', created_at: now, updated_at: now};
   const branches: Branch[] = [
@@ -63,9 +62,6 @@ export async function seedMockData(): Promise<void> {
   const permissions: Permission[] = ALL_KEYS.map((k, i) => ({id: `perm-${i}`, permission_key: k, description: k, status: 'Active'}));
   const memberships: Membership[] = [
     {id: 'demo-mem-1', user_id: DEMO.userId, company_id: DEMO.companyId, branch_id: DEMO.branchA, role_id: DEMO.ownerRole, assignment_status: 'Active', expires_at: null, created_at: now, updated_at: now},
-  ];
-  const invitations: Invitation[] = [
-    {id: 'demo-inv-1', company_id: DEMO.companyId, branch_id: DEMO.branchA, role_id: DEMO.workerRole, email: 'invitee@demo.local', token: 'demo-token', status: 'Pending', invited_by: DEMO.userId, accepted_user_id: null, expires_at: expires, created_at: now, updated_at: now},
   ];
 
   // POS demo data: a small price book + finished-goods stock in Branch A (weigh-POS is usable offline/demo).
@@ -94,7 +90,6 @@ export async function seedMockData(): Promise<void> {
   await offlineDB.roles.bulkPut(roles);
   await offlineDB.permissions.bulkPut(permissions);
   await offlineDB.memberships.bulkPut(memberships);
-  await offlineDB.invitations.bulkPut(invitations);
   await offlineDB.products.bulkPut(products);
   await offlineDB.finishedGoods.bulkPut(finishedGoods);
   await offlineDB.meta.bulkPut([
@@ -125,7 +120,6 @@ const TABLE_MAP: Record<string, Table<AnyRow, string>> = {
   branches: tbl(offlineDB.branches),
   roles: tbl(offlineDB.roles),
   user_branch_roles: tbl(offlineDB.memberships),
-  invitations: tbl(offlineDB.invitations),
   crop_categories: tbl(offlineDB.cropCategories),
   crop_varieties: tbl(offlineDB.cropVarieties),
   crop_profiles: tbl(offlineDB.cropProfiles),

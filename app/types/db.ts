@@ -101,7 +101,6 @@ export type PermissionKey =
   | 'company.manage'
   | 'branch.manage'
   | 'role.manage'
-  | 'user.invite'
   | 'membership.manage'
   | 'crop.manage'
   | 'product.manage'

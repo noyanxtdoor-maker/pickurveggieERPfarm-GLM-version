@@ -27,7 +27,8 @@ describe('mock / offline-dev adapter', () => {
     expect(snap?.keys).toContain('schedule.manage');
     expect(snap?.keys).toContain('project.manage');
     expect(snap?.keys).toContain('customer.manage');
-    expect(snap?.keys.length).toBe(29);
+    // P1I (2026-07-15): Invitations retired → 'user.invite' dropped from ALL_KEYS in mock.ts → 28 keys (was 29).
+    expect(snap?.keys.length).toBe(28);
   });
 
   it('drains the outbox into Dexie via mockSender (offline create works, no cloud)', async () => {

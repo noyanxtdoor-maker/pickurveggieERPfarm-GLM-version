@@ -214,7 +214,7 @@ export default function ApprovalsScreen() {
         {rows === null ? (
           <Skeleton rows={3} />
         ) : rows.length === 0 ? (
-          <EmptyState title="No members yet" hint="Assign members from the Members tab or send an invitation." />
+          <EmptyState title="No members yet" hint="New members self-sign up at the login screen and appear in the pending-approvals queue for you to appoint." />
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-sm">

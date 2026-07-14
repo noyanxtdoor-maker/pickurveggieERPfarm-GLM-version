@@ -38,14 +38,6 @@ export const roleEditSchema = z.object({
 });
 export type RoleEditInput = z.infer<typeof roleEditSchema>;
 
-export const inviteSchema = z.object({
-  branch_id: z.string().uuid('Select a branch'),
-  role_id: z.string().uuid('Select a role'),
-  email: z.string().trim().email('Invalid email').optional().or(z.literal('')),
-  valid_days: z.coerce.number().int().min(1, 'Min 1 day').max(30, 'Max 30 days'),
-});
-export type InviteInput = z.infer<typeof inviteSchema>;
-
 export const membershipAssignSchema = z.object({
   user_id: z.string().uuid('Select a user'),
   branch_id: z.string().uuid('Select a branch'),
