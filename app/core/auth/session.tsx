@@ -21,7 +21,7 @@ interface SessionValue {
   user: User | null;
   authUserId: string | null;
   configured: boolean;
-  signIn: (email: string, password: string) => Promise<{error: string | null}>;
+  signIn: (identifier: string, password: string) => Promise<{error: string | null}>;
   // P1A self-signup: creates the auth identity; the DB trigger creates the ERP identity (Active, zero
   // memberships = awaiting approval, C2 §3). requestedRole is a WISH in metadata — the queue shows it,
   // the approver assigns the real role. needsConfirmation = email-confirm is on and no session yet.
@@ -79,12 +79,27 @@ export function SessionProvider({children}: {children: ReactNode}) {
       user: session?.user ?? null,
       authUserId: session?.user?.id ?? null,
       configured: isSupabaseConfigured,
-      signIn: async (email, password) => {
+      signIn: async (identifier, password) => {
         if (MOCK_MODE) {
           await offlineDB.meta.put({key: 'mock-auth', value: true});
           setSession(MOCK_SESSION);
           setStatus('authenticated');
           return {error: null};
+        }
+        // P1J username-login: if the identifier isn't email-shaped, resolve the username→email via the
+        // anon-reachable RPC (the one deliberate anon grant, see supabase/migrations/20260715090000_p1j).
+        // Email-shaped identifiers pass straight through unchanged. A NULL/empty resolve → "invalid
+        // credentials" (NOT "no such user" — we don't leak existence per the Finding-1 hardening).
+        let email = identifier;
+        if (identifier && !identifier.includes('@')) {
+          const {data, error: rpcErr} = await supabase.rpc('resolve_login_email', {p_identifier: identifier});
+          if (rpcErr) return {error: rpcErr.message};
+          if (!data) {
+            // Unknown username OR Suspended/Archived user (function filters Active per Finding-1 hardening).
+            // Surface the same generic "invalid credentials" a wrong password would — no enumeration signal.
+            return {error: 'Invalid credentials.'};
+          }
+          email = data as string;
         }
         const {error} = await supabase.auth.signInWithPassword({email, password});
         return {error: error ? error.message : null};

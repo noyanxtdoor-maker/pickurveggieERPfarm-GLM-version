@@ -25,11 +25,13 @@ begin
 end $$;
 
 -- ── (2) EXECUTE revoked from authenticated — the attack path is closed ──
+-- Use has_function_privilege (the right introspection for EXECUTE; pg_has_role checks role membership,
+-- not function privileges, and rejects 'EXECUTE' as an unknown privilege type).
 do $$ declare has_exec boolean;
 begin
-  select pg_has_role('authenticated', (select oid from pg_proc where proname='accept_invitation' and pronamespace='public'::regnamespace), 'EXECUTE') into has_exec;
+  select has_function_privilege('authenticated', 'public.accept_invitation(text)', 'EXECUTE') into has_exec;
   if has_exec then raise exception 'DEFECT p1i: authenticated still holds EXECUTE on accept_invitation — the signed-in-mismatch attack path is NOT closed'; end if;
-  select pg_has_role('authenticated', (select oid from pg_proc where proname='invite_user' and pronamespace='public'::regnamespace), 'EXECUTE') into has_exec;
+  select has_function_privilege('authenticated', 'public.invite_user(uuid, uuid, uuid, text, integer)', 'EXECUTE') into has_exec;
   if has_exec then raise exception 'DEFECT p1i: authenticated still holds EXECUTE on invite_user'; end if;
   raise notice 'PASS p1i: EXECUTE revoked from authenticated on both invitations RPCs — the auth-uid-vs-intended bug is unreachable';
 end $$;
@@ -38,7 +40,7 @@ end $$;
 do $$ declare n int;
 begin
   select count(*) into n from information_schema.tables where table_schema='public' and table_name='invitations';
-  if n<>1 then raise exception 'DEFECT p1i: invitations table missing (never-hard-delete violated — accepted-row history lost)', n; end if;
+  if n<>1 then raise exception 'DEFECT p1i: invitations table missing (never-hard-delete violated — accepted-row history lost), found %', n; end if;
   -- existing rows (any status) must be untouched by this migration — it only revokes grants
   raise notice 'PASS p1i: invitations table preserved (retired, not hard-deleted)';
 end $$;

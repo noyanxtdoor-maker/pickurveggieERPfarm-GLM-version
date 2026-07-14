@@ -1,12 +1,12 @@
 // Login / Create POS Account (P1A/P1B; redesigned 2026-07-13 to the owner's mobile/tablet/laptop
 // mockups — dark theme, tractor-field hero photo, stacked on phone/tablet, split 50/50 on laptop+).
 // Signup no longer carries a requested role (owner: redundant — the approver always assigns the real
-// one, C2 §3). Email or username accepted at sign-in (see the "EMAIL / USERNAME" label): only email
-// actually authenticates today (Supabase Auth has no native username login) — true username resolution
-// is a separate, deliberately deferred decision (it would need the app's first-ever anon-reachable
-// RPC, a real change to the "zero anon grants" security posture this project tests for). The field
-// accepts either shape now so the UI already matches the design; typing a bare username currently
-// surfaces the same "invalid credentials" a wrong password would. Email+password via Supabase Auth;
+// one, C2 §3). Email or username is accepted at sign-in (see the "EMAIL / USERNAME" label): P1J
+// (2026-07-15) wired the pre-auth username→email lookup via the resolve_login_email anon-reachable
+// RPC (the one deliberate anon grant in the schema, scoped to Active accounts only — see
+// supabase/migrations/20260715090000_p1j_username_login.sql and the Finding-1 hardening in its
+// header). Unknown usernames OR Suspended/Archived users return the same generic "invalid
+// credentials" a wrong password would (no enumeration-signal leak). Email+password via Supabase Auth;
 // self-service reset (B7 §2) + Google OAuth. Quick test identities appear in DEMO mode only.
 import {useState} from 'react';
 import {Navigate} from 'react-router-dom';

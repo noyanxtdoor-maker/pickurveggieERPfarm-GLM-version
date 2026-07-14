@@ -264,29 +264,39 @@ begin
   exception when insufficient_privilege then raise notice 'PASS p1c: role_permissions insert requires outranking the target role (blocks self-escalation)'; end;
 end $$;
 
--- ── P1C.1 — invite_user() now rank-checked (closes the parallel-entry-point escalation §Fix1) ──
-do $$ declare v_company uuid; v_branch uuid; v_co_role uuid; v_own_role uuid; v_emp_role uuid; v_token text; n int;
+-- ── P1C.1 — invite_user() EXECUTE revoked by P1I retire (2026-07-14) ──
+-- Previously this block tested outranks_role on invite_user. After P1I revoked EXECUTE from authenticated,
+-- the function is no longer reachable by auth'd users AT ALL — so the rank-check coverage is dead AND
+-- the new guarantee ("EXECUTE revoked") is proven by scripts/guards/invitations-retired.sql (clause 2).
+-- This block now proves the FUNCTIONAL outcome matches invitations-retired: an authenticated role calling
+-- invite_user hits insufficient_privilege (so neither the L280 attack path nor the L285 happy path can
+-- fire — both are dead post-retire). co-owner-as-post-retire-now-permless substitutes for the prior fixture.
+do $$ declare v_company uuid; v_branch uuid; v_own_role uuid; v_emp_role uuid; v_token text;
   v_co_auth uuid := '0b000000-0000-0000-0000-0000000000b5';
+  v_hit boolean := false;
 begin
   set local role postgres;
   select company_id into v_company from public.bootstrap_state where id;
   select id into v_branch from public.branches where company_id=v_company;
-  select id into v_co_role  from public.roles where company_id=v_company and role_key='co_owner';
   select id into v_own_role from public.roles where company_id=v_company and role_key='owner';
   select id into v_emp_role from public.roles where company_id=v_company and role_key='employee';
 
-  -- co-owner (rank 40, holds user.invite via the full catalog) CANNOT invite into the owner role (rank 50)
   set local role authenticated; perform set_config('request.jwt.claims', json_build_object('sub', v_co_auth)::text, true);
+
+  -- The attack path: co-owner tries invite into peer-or-above (owner). Post-retire: insufficient_privilege (rank-check never runs).
   begin
     perform public.invite_user(v_company, v_branch, v_own_role, 'attacker@t.local', 7);
-    raise exception 'DEFECT p1c1: co-owner invited someone into the owner role';
-  exception when insufficient_privilege then raise notice 'PASS p1c1: invite_user rejects inviting into a peer-or-above role (outranks_role enforced)'; end;
+    raise exception 'DEFECT p1c1: invite_user() executed for authenticated — EXECUTE revoke was bypassed';
+  exception when insufficient_privilege then v_hit := true; end;
 
-  -- co-owner CAN still invite into a role strictly below their own tier (unchanged happy path)
-  v_token := public.invite_user(v_company, v_branch, v_emp_role, 'nobody@t.local', 7);
-  select count(*) into n from public.invitations where token = v_token and role_id = v_emp_role;
-  if n<>1 then raise exception 'DEFECT p1c1: invite into a role below the inviter''s tier stopped working'; end if;
-  raise notice 'PASS p1c1: invite_user still works for a role strictly below the inviter''s own tier';
+  -- The happy path: co-owner tries invite into strict-below (employee). Post-retire: same insufficient_privilege.
+  begin
+    v_token := public.invite_user(v_company, v_branch, v_emp_role, 'nobody@t.local', 7);
+    raise exception 'DEFECT p1c1: invite_user() happy-path executed for authenticated — EXECUTE revoke was bypassed (token=%)', v_token;
+  exception when insufficient_privilege then null; end;
+
+  if not v_hit then raise exception 'DEFECT p1c1: neither attack nor happy-path raised insufficient_privilege'; end if;
+  raise notice 'PASS p1c1: invite_user() unreachable for authenticated (P1I EXECUTE-revoke holds; rank-check is moot)';
 end $$;
 
 -- ── P1C.1 — self-reactivation of a dormant higher-rank row now blocked (closes §Fix2) ──
