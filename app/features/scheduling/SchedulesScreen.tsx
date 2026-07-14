@@ -8,6 +8,7 @@ import {Link} from 'react-router-dom';
 import * as Dialog from '@radix-ui/react-dialog';
 import {Calendar as CalIcon, ChevronLeft, ChevronRight, FolderKanban, Plus, X} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
+import {useSync} from '../../core/offline/sync';
 import {usePermissions} from '../../core/permissions/permissions';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {EmptyState, useToast} from '../../components/feedback';
@@ -32,6 +33,7 @@ const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart
 
 export default function SchedulesScreen() {
   const {companyId, has} = usePermissions();
+  const {refreshTick} = useSync();
   const {notify} = useToast();
   const canRead = has('schedule.read');
   const canManage = has('schedule.manage');
@@ -57,7 +59,7 @@ export default function SchedulesScreen() {
     schedulingApi.fetchEvents(companyId, branchId).then(setEvents).catch(() => setEvents([]));
     if (canReadProjects) projectsApi.fetchProjects(companyId, branchId).then(setProjects).catch(() => setProjects([]));
   }, [companyId, branchId, canRead, canReadProjects]);
-  useEffect(reload, [reload]);
+  useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs calendar events (item 4 fan-out)
 
   // M6C filter (owner ask: "add a filter button too for everyone"). The SERVER already hides Management
   // events from users without schedule.read_private — this is a view filter on top, never the gate.

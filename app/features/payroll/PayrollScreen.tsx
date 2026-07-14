@@ -8,6 +8,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import {HandCoins, Link2, Users2, UserPlus, Wallet, X} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
 import {usePermissions} from '../../core/permissions/permissions';
+import {useSync} from '../../core/offline/sync';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
@@ -23,6 +24,7 @@ export default function PayrollScreen() {
   const {notify} = useToast();
   const canRead = has('payroll.read');
   const canManage = has('payroll.manage');
+  const {refreshTick} = useSync();
 
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
   const [branchId, setBranchId] = useState<string | undefined>(undefined);
@@ -43,7 +45,7 @@ export default function PayrollScreen() {
       payrollApi.fetchWages(companyId, branchId).then(setWages).catch(() => setWages([]));
     }
   }, [companyId, canRead, branchId]);
-  useEffect(reload, [reload]);
+  useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs the roster/advance/wage lists (item 4 fan-out)
 
   const empName = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e.name])), [employees]);
 
@@ -346,6 +348,7 @@ export default function PayrollScreen() {
 // ── M5C "My Payroll" — read-only self view for users WITHOUT payroll.read. The server's RLS is the gate:
 // fetches return only the employee row linked to this user (and their advances/wages), or nothing at all.
 function MyPayroll({companyId}: {companyId?: string}) {
+  const {refreshTick} = useSync();
   const [me, setMe] = useState<Employee | null | undefined>(undefined); // undefined=loading, null=not linked
   const [advances, setAdvances] = useState<CashAdvance[]>([]);
   const [wages, setWages] = useState<WagePayment[]>([]);
@@ -360,7 +363,7 @@ function MyPayroll({companyId}: {companyId?: string}) {
         setWages(await payrollApi.fetchEmployeeWages(companyId, mine.id).catch(() => []));
       }
     }).catch(() => setMe(null));
-  }, [companyId]);
+  }, [companyId, refreshTick]); // refreshTick — manual tap-to-sync re-runs my own pay record (item 4 fan-out)
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@ import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
 import {AlertTriangle, ClipboardList, FileText, Hammer, Minus, Package, Plus, ReceiptText, RefreshCw, ShieldAlert, ShoppingBag, X} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
+import {useSync} from '../../core/offline/sync';
 import {hydrateBranches} from '../../core/offline/hydrate';
 import {usePermissions} from '../../core/permissions/permissions';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
@@ -23,6 +24,7 @@ const ONLINE_SOURCES = ['Lazada', 'Shopee', 'TikTok'];
 
 export default function InventoryScreen() {
   const {companyId, has} = usePermissions();
+  const {refreshTick} = useSync();
   const {notify} = useToast();
   const canPurchase = has('inventory.purchase');
   const canAdjust = has('inventory.adjust');
@@ -53,7 +55,7 @@ export default function InventoryScreen() {
     inventoryApi.fetchEquipment(companyId, branchId).then(setEquipment).catch(() => setEquipment([]));
     inventoryApi.fetchEquipmentLogs(companyId).then(setLogs).catch(() => setLogs([]));
   }, [companyId, branchId]);
-  useEffect(reload, [reload]);
+  useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs inventory lists (item 4 fan-out)
 
   // ── purchase modal ──
   const [buyOpen, setBuyOpen] = useState(false);

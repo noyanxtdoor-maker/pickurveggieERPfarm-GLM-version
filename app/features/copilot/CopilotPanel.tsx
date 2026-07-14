@@ -12,6 +12,7 @@ import {useEffect, useState, useCallback, useRef} from 'react';
 import {useLiveQuery} from 'dexie-react-hooks';
 import {Sparkles, Send, Trash2, RefreshCw, CloudOff, Wifi} from 'lucide-react';
 import {usePermissions} from '../../core/permissions/permissions';
+import {useSync} from '../../core/offline/sync';
 import {Card, PageHeader, cn} from '../../components/ui';
 import {useToast} from '../../components/feedback';
 import {usePref} from '../../core/prefs/prefs';
@@ -31,6 +32,7 @@ const tagOf = (m: CopilotMessage): number =>
 
 export default function CopilotPanel() {
   const {companyId} = usePermissions();
+  const {refreshTick} = useSync();
   const {notify} = useToast();
   const [enabled] = usePref('copilot_enabled', '1');
   const [lmUrl] = usePref('copilot_lm_url', LM_DEFAULT_URL);
@@ -54,7 +56,7 @@ export default function CopilotPanel() {
       .catch(() => { if (!cancelled) setBrief(null); })
       .finally(() => { if (!cancelled) setBriefLoading(false); });
     return () => { cancelled = true; };
-  }, [companyId]);
+  }, [companyId, refreshTick]); // refreshTick — manual tap-to-sync re-gathers the morning brief (item 4 fan-out)
 
   // Check LM Studio connectivity on mount + every 30s
   const checkLm = useCallback(async () => {

@@ -5,11 +5,13 @@ import {useLiveQuery} from 'dexie-react-hooks';
 import {FolderTree, Layers, Plus, Sprout, Tractor} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
 import {usePermissions} from '../../core/permissions/permissions';
+import {useSync} from '../../core/offline/sync';
 import {ActionTile, Card, PageHeader, StatCard} from '../../components/ui';
 import {cropApi} from './api';
 
 export default function CropDashboard() {
   const {companyId, has} = usePermissions();
+  const {refreshTick} = useSync();
   const navigate = useNavigate();
   const canManage = has('crop.manage');
 
@@ -20,7 +22,7 @@ export default function CropDashboard() {
     cropApi.varieties.fetch(companyId).then((r) => offlineDB.cropVarieties.bulkPut(r)).catch(() => undefined);
     cropApi.profiles.fetch(companyId).then((r) => offlineDB.cropProfiles.bulkPut(r)).catch(() => undefined);
     cropApi.templates.fetch(companyId).then((r) => offlineDB.plantingTemplates.bulkPut(r)).catch(() => undefined);
-  }, [companyId]);
+  }, [companyId, refreshTick]); // refreshTick — manual tap-to-sync re-warms the counts (item 4 fan-out)
 
   const cats = useLiveQuery(async () => (companyId ? offlineDB.cropCategories.where('company_id').equals(companyId).count() : 0), [companyId], 0);
   const vars = useLiveQuery(async () => (companyId ? offlineDB.cropVarieties.where('company_id').equals(companyId).count() : 0), [companyId], 0);
