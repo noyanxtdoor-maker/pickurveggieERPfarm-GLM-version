@@ -67,6 +67,23 @@ body,
   height: 100%;
 }
 
+/* Mobile responsive base — small viewports get a slightly smaller root font so the `rem`-based
+   Tailwind text utilities (text-lg/xl/2xl/3xl etc.) scale down across every screen without
+   touching each component. 15px on <640px screens vs the browser default 16px; the ~6% shrink
+   cascades through all rem-based sizes (1.125rem text-lg → ~17px instead of 18px, etc.) This
+   is the global fix for "words/elements too big on a small screen" (owner 2026-07-15): one rule
+   for all 13 screens, no per-component refactor required. Per-screen tune-ups can layer on top. */
+@media (max-width: 639px) {
+  html {
+    font-size: 93.75%; /* 15px instead of 16px — gentle global shrink on phone-class viewports */
+  }
+}
+@media (max-width: 374px) {
+  html {
+    font-size: 87.5%; /* 14px for very small phones (≤374px, e.g. iPhone SE 1st gen, small Androids) */
+  }
+}
+
 body {
   margin: 0;
   background-color: var(--color-farm-bg);
