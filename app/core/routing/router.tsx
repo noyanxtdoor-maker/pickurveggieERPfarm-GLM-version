@@ -30,12 +30,11 @@ const SettingsScreen = lazy(() => import('../../features/settings/SettingsScreen
 const CopilotPanel = lazy(() => import('../../features/copilot/CopilotPanel'));
 const OperationsLayout = lazy(() => import('../../features/operations/OperationsLayout'));
 const CustomersScreen = lazy(() => import('../../features/customers/CustomersScreen'));
-const CropsLayout = lazy(() => import('../../features/crops/CropsLayout'));
-const CropDashboard = lazy(() => import('../../features/crops/CropDashboard'));
-const CategoriesScreen = lazy(() => import('../../features/crops/CategoriesScreen'));
-const VarietiesScreen = lazy(() => import('../../features/crops/VarietiesScreen'));
-const ProfilesScreen = lazy(() => import('../../features/crops/ProfilesScreen'));
-const TemplatesScreen = lazy(() => import('../../features/crops/TemplatesScreen'));
+// Crops & Plans removed (owner 2026-07-15): the /operations/crops tab + its subtree + the
+// app/features/crops/ feature folder were deleted per explicit owner instruction. The offline
+// Dexie schema (crop_* tables) + types + mock seeders are deliberately retained — purging them
+// would force an offline migration that could break on-device Dexie DBs of anyone who installed
+// the app before removal (the dead tables are harmless; removing them is not worth the risk).
 
 function RequireAuth({children}: {children: ReactNode}) {
   const {status} = useSession();
@@ -91,24 +90,13 @@ export const router = createBrowserRouter([
           {index: true, element: <Navigate to="schedules" replace />},
           {path: 'schedules', element: <SchedulesScreen />},
           {path: 'projects', element: <ProjectsScreen />},
-          {
-            path: 'crops',
-            element: <CropsLayout />,
-            children: [
-              {index: true, element: <Navigate to="dashboard" replace />},
-              {path: 'dashboard', element: <CropDashboard />},
-              {path: 'categories', element: <CategoriesScreen />},
-              {path: 'varieties', element: <VarietiesScreen />},
-              {path: 'profiles', element: <ProfilesScreen />},
-              {path: 'templates', element: <TemplatesScreen />},
-            ],
-          },
+          // Crops & Plans tab removed (owner 2026-07-15) — see note above the RequireAuth block.
         ],
       },
       // Legacy paths → Operations hub (bookmarks/tiles keep working)
       {path: 'schedules', element: <Navigate to="/operations/schedules" replace />},
       {path: 'projects', element: <Navigate to="/operations/projects" replace />},
-      {path: 'crops/*', element: <Navigate to="/operations/crops" replace />},
+      // Crops legacy redirect removed with the tab — /crops/* now falls through to the catch-all.
       {path: 'reports', element: <Placeholder title="Reports" />},
       {path: 'copilot', element: <CopilotPanel />},
       {path: 'settings', element: <SettingsScreen />},

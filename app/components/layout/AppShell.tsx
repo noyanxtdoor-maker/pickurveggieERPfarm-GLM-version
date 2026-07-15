@@ -259,10 +259,11 @@ function TopBar() {
         <button
           onClick={manualSync}
           className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold', online ? 'text-farm-green' : 'text-farm-warn')}
-          title={online ? 'Online — tap to sync + refresh' : 'Offline'}
+          title={syncing ? 'Syncing…' : online ? 'Online — tap to sync + refresh' : 'Offline'}
+          disabled={syncing}
         >
-          {online ? <RefreshCw size={18} aria-hidden /> : <CloudOff size={18} aria-hidden />}
-          {syncing ? <RefreshCw size={16} className="animate-spin" aria-hidden /> : null}
+          {online ? <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} aria-hidden /> : <CloudOff size={18} aria-hidden />}
+          {syncing ? <span className="text-xs">Syncing…</span> : null}
           {pending > 0 ? <span className="rounded-full bg-amber-200 px-2 text-amber-900">{pending}</span> : null}
         </button>
         <div className="hidden min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold text-farm-ink md:inline-flex">

@@ -23,6 +23,30 @@ export interface MemberRow extends Membership {
   roleKey: string;
 }
 
+// Directory dedupe (owner 2026-07-15, fixes the "role change creates a new account" bug):
+// role_id is immutable by design → a role change expires the old assignment + inserts a new one
+// (audit history preserved, per AGENTS §2 reversal-by-addition). That left the directory showing
+// BOTH the Expired old row AND the Active new row for the same user → looked like a new account.
+// Fix the display, not the write: one row per user — Active membership preferred, else the most
+// recent Expired (so the "Reactivate" action on the Approvals screen still has a row to flip).
+// The full audit trail stays in the DB untouched.
+function dedupeByUser<T extends MemberRow>(rows: T[]): T[] {
+  const byUser = new Map<string, T>();
+  for (const r of rows) {
+    const prev = byUser.get(r.user_id);
+    if (!prev) { byUser.set(r.user_id, r); continue; }
+    // Active beats Expired; within the same status, newer wins (updated_at desc, fallback created_at).
+    const rActive = r.assignment_status === 'Active';
+    const pActive = prev.assignment_status === 'Active';
+    if (rActive && !pActive) { byUser.set(r.user_id, r); continue; }
+    if (pActive && !rActive) continue;
+    const rTime = String(r.updated_at ?? r.created_at ?? '');
+    const pTime = String(prev.updated_at ?? prev.created_at ?? '');
+    if (rTime > pTime) byUser.set(r.user_id, r);
+  }
+  return [...byUser.values()];
+}
+
 export const membershipsApi = {
   async fetch(companyId: string): Promise<MemberRow[]> {
     if (MOCK_MODE) {
@@ -35,7 +59,8 @@ export const membershipsApi = {
       const bm = new Map(brs.map((b) => [b.id, b.name]));
       const rm = new Map(rls.map((r) => [r.id, r.role_key]));
       const um = new Map(users.map((u) => [u.id, u.display_name]));
-      return mems.map((m) => ({...m, userName: um.get(m.user_id) ?? '(demo user)', branchName: bm.get(m.branch_id) ?? m.branch_id, roleKey: rm.get(m.role_id) ?? m.role_id}));
+      const mapped = mems.map((m) => ({...m, userName: um.get(m.user_id) ?? '(demo user)', branchName: bm.get(m.branch_id) ?? m.branch_id, roleKey: rm.get(m.role_id) ?? m.role_id}));
+      return dedupeByUser(mapped);
     }
     const {data, error} = await supabase
       .from('user_branch_roles')
@@ -43,12 +68,13 @@ export const membershipsApi = {
       .eq('company_id', companyId);
     if (error) throw new Error(error.message);
     type Row = Membership & {users: {display_name: string} | null; branches: {name: string} | null; roles: {role_key: string} | null};
-    return ((data ?? []) as Row[]).map((r) => ({
+    const mapped = ((data ?? []) as Row[]).map((r) => ({
       ...r,
       userName: r.users?.display_name ?? '(unknown)',
       branchName: r.branches?.name ?? r.branch_id,
       roleKey: r.roles?.role_key ?? r.role_id,
     }));
+    return dedupeByUser(mapped);
   },
   async users(): Promise<Array<{id: string; display_name: string}>> {
     if (MOCK_MODE) return mockUsers();

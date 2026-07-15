@@ -1,13 +1,13 @@
-// Operations hub (owner 2026-07-04): Schedules & Plans, Crops & Plans, and Project Checklists live under ONE
-// nav entry with Accounting-style tabs (sub-tabs stay inside each feature, e.g. Crops' own tab row).
-// Pure layout — every screen keeps its own permissions and data seams.
+// Operations hub (owner 2026-07-04): Schedules & Plans and Project Checklists live under ONE
+// nav entry with Accounting-style tabs. Crops & Plans removed (owner 2026-07-15) — the tab +
+// its /operations/crops subtree + the app/features/crops/ feature folder were deleted per
+// explicit owner instruction. Pure layout — every screen keeps its own permissions and data seams.
 import {NavLink, Outlet} from 'react-router-dom';
-import {CalendarDays, FolderKanban, Sprout} from 'lucide-react';
+import {CalendarDays, FolderKanban} from 'lucide-react';
 import {cn} from '../../components/ui';
 
 const TABS = [
   {to: 'schedules', label: 'Schedules & Plans', icon: CalendarDays},
-  {to: 'crops', label: 'Crops & Plans', icon: Sprout},
   {to: 'projects', label: 'Project Checklists', icon: FolderKanban},
 ] as const;
 
