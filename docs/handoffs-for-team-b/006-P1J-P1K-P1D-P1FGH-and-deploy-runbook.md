@@ -77,7 +77,7 @@ Three detours logged for future AI models to skip:
 
 - **Working dir:** `C:/Users/sherl/Documents/pick-ur-veggie-farm - GLM Version`
 - **Container:** `supabase_db_pickurveggieerp-glm` port 54522 (Repo A port 56322, never touched). Repo B uses port cluster 54520–54529 set 2026-07-12; Repo A uses 54320–54329. The two stacks can run simultaneously without collision.
-- **Guard run pattern (single):** `docker exec -i supabase_db_pickurgeggieerp-glm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
+- **Guard run pattern (single):** `docker exec -i supabase_db_pickurveggieerp-glm psql -U postgres -d postgres -v ON_ERROR_STOP=1 < scripts/guards/<file>.sql`
 - **Guard battery:** `for f in scripts/guards/*.sql; do n=$(basename "$f" .sql); out=$(docker exec -i C psql -U postgres -d postgres -v ON_ERROR_STOP=1 < "$f" 2>&1); ... if grep -qiE "^rollback|^ROLLBACK|PASS" ...; done` — NOTE tail-1 grep alone fails on guards whose final stdout line is `DO` or `\d` output; use grep over the WHOLE output for `PASS` or `^ROLLBACK`.
 - **CI self-check** (per AGENTS §3, never print the token):
   ```bash

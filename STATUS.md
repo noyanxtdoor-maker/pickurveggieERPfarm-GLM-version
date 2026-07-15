@@ -48,7 +48,7 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
 | `vite build` | ✅ ok |
 | Cloud migration list (`supabase migration list --linked`) | ✅ **35 / 35 local = remote** (2026-07-15: 7 new migrations pushed via `npx supabase db push` — p1i retire-invitations, p1j username-login, p1k realtime-publication, p1d payroll-role-link, p1f reject-pending, p1g archive-revoked, p1h employee-calendar) |
 | Cloud auth signup trigger (P1A `on_auth_user_created`) | ✅ verified — signup 200, identity created, email_confirmation required (expected) |
-| Vercel deployment (`https://pickurgeggie-erp-glm.vercel.app/`) | ✅ 200 OK (re-verified 2026-07-14 — root + `/login` both HTTP 200 to anonymous curl; the prior "404 DEPLOYMENT_NOT_FOUND" conclusion was a misspelled-domain error, see §4 2026-07-14 entry). 2026-07-15 DEPLOYED: four new commits (`f49c1d3` p1j username login, `5049285` p1k realtime auto-sync, `77d0b79` p1d payroll-role-link + managed positions + job_title, `38d90d8` p1f/p1g/p1h reject-pending + archive-revoked + employee-calendar) + `92853d1` p1i retire-invitations are now LIVE on production — `npx supabase db push` applied 7 new migrations (remote 25→35 local=remote), `VERCEL_TOKEN` deploy succeeded in 24s, smoke check HTTP 200 + `<title>PickUrVeggie ERP V3</title>` confirmed at `https://pickurgeggie-erp-glm.vercel.app/`. See handoff A6 §A6 |
+| Vercel deployment (`https://pickurveggie-erp-glm.vercel.app/`) | ✅ 200 OK (re-verified 2026-07-14 — root + `/login` both HTTP 200 to anonymous curl; the prior "404 DEPLOYMENT_NOT_FOUND" conclusion was a misspelled-domain error, see §4 2026-07-14 entry). 2026-07-15 DEPLOYED: four new commits (`f49c1d3` p1j username login, `5049285` p1k realtime auto-sync, `77d0b79` p1d payroll-role-link + managed positions + job_title, `38d90d8` p1f/p1g/p1h reject-pending + archive-revoked + employee-calendar) + `92853d1` p1i retire-invitations are now LIVE on production — `npx supabase db push` applied 7 new migrations (remote 25→35 local=remote), `VERCEL_TOKEN` deploy succeeded in 24s, smoke check HTTP 200 + `<title>PickUrVeggie ERP V3</title>` confirmed at `https://pickurveggie-erp-glm.vercel.app/`. See handoff A6 §A6 |
 | Latest CI run on the feature branch (`a327cc9`, HEAD) | ✅ green (install · tsc · test · build · DB guards · secret scan) — CI for `13ee8c1` not yet audited (owner pastes Actions URL) |
 | CI runs a browser? | ❌ no — E2E is manual, mock-mode only |
 
@@ -463,7 +463,7 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   `supabase db reset` = 25 migrations clean exit 0 against the new 54522 Postgres. `npm run lint` exit 0.
   `npm run test` = 18 files / 89 tests / 0 fail (5.40s). `npm run build` = ✓ 10.10s exit 0. Cloud project
   `jabjyvdkadcbfocaerno` untouched. **NOT verified locally this session:** the 14-guard SQL battery +
-  `guard:drift` — two `docker exec supabase_db_pickurgeggieerp-glm` attempts both returned "No such
+  `guard:drift` — two `docker exec supabase_db_pickurveggieerp-glm` attempts both returned "No such
   container" despite `docker ps` showing that container running healthy (Windows-Docker daemon lookup
   quirk in this terminal; not a name-spelling error). HARD STOP per SESSION_PROMPT E7 — CI will re-verify
   the 14 guards against the new 5452x cluster on the next push. Pre-swap pg_dump (901KB) saved to gitignored
