@@ -103,10 +103,20 @@ export default function PosScreen() {
     if (!selected) return;
     const w = parseFloat(weight);
     if (isNaN(w) || w <= 0) return notify('Enter a weight greater than 0 kg.', 'error');
+    const farmPrice = farmPerKg(selected.retail_per_kg);
+    // Owner directive (2026-07-15): "sold IS the inventory and the sale" — when a finished-goods
+    // batch exists, decrement it (normal weighed path). When NO batch exists (the product was just
+    // added to the price book + nothing has been harvested/received into stock yet), sell manually
+    // at the farm per-kg price × weight, no stock precondition. Recorded as a weighed-bulk line
+    // (finished_goods_batch_id=null) — the server's pos_record_sale bulk path accepts this; no
+    // inventory_movement row is created (the sale itself IS the inventory event, per the owner).
     const batch = stock.find((f) => f.product_id === selected.id && f.available - (claimed.get(f.id) ?? 0) >= w);
-    if (!batch) return notify(`Not enough ${selected.name} stock for ${w} kg.`, 'error');
-    // charged price = FARM price (prototype DISCOUNT=0.10); retail snapshotted for the saved line; server recomputes
-    setBasket([...basket, {product_id: selected.id, finished_goods_batch_id: batch.id, name: selected.name, weight_kg: w, unit_price: farmPerKg(selected.retail_per_kg), retail_per_kg: selected.retail_per_kg}]);
+    if (batch) {
+      setBasket([...basket, {product_id: selected.id, finished_goods_batch_id: batch.id, name: selected.name, weight_kg: w, unit_price: farmPrice, retail_per_kg: selected.retail_per_kg}]);
+    } else {
+      // No stock — manual sale at farm price × weight (sold IS the inventory).
+      setBasket([...basket, {product_id: selected.id, finished_goods_batch_id: null, name: `${selected.name} (Manual)`, weight_kg: w, unit_price: farmPrice, retail_per_kg: selected.retail_per_kg}]);
+    }
     setSelected(null);
     setWeight('');
     setBulkOpen(false); setBulkPrice('');
@@ -239,12 +249,12 @@ export default function PosScreen() {
                     <button
                       key={p.id}
                       onClick={() => {setSelected(p); setWeight('');}}
-                      disabled={out}
+                      // Owner directive (2026-07-15): always clickable — "sold IS the inventory"; manual sale at farm price × weight when no stock.
+                      disabled={false}
                       className={cn(
                         'group relative flex h-40 flex-col items-center justify-center gap-2 rounded-2xl border p-3 text-center transition select-none',
                         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-farm-green-500',
                         selected?.id === p.id ? 'border-farm-green bg-farm-accent-soft shadow-sm ring-2 ring-farm-green' : 'border-farm-accent-soft bg-farm-card hover:border-farm-green hover:bg-farm-bg/50',
-                        out && 'cursor-not-allowed opacity-40',
                       )}
                     >
                       <span className="absolute right-2 top-2 rounded bg-farm-accent-soft px-1.5 py-0.5 font-mono text-[9px] font-black text-farm-green">#{101 + idx}</span>
@@ -255,7 +265,7 @@ export default function PosScreen() {
                         <span className="block truncate text-sm font-extrabold leading-tight text-farm-ink">{p.name}</span>
                         <span className="mt-1 block text-xs font-black text-farm-green">{formatPeso(farmPerKg(p.retail_per_kg))}/kg</span>
                         <span className="block text-[10px] text-farm-muted line-through">Reg: {formatPeso(p.retail_per_kg)}</span>
-                        <span className={cn('block text-[10px] font-semibold', out ? 'text-farm-danger' : 'text-farm-muted')}>{out ? 'Out of stock' : `${round2(avail)} kg left`}</span>
+                        <span className={cn('block text-[10px] font-semibold', out ? 'text-farm-muted' : 'text-farm-muted')}>{out ? 'Manual sale' : `${round2(avail)} kg left`}</span>
                       </span>
                     </button>
                   );

@@ -100,6 +100,8 @@ export const posApi = {
     };
 
     if (MOCK_MODE) {
+      // Only weighed lines WITH a real batch need the stock check. Manual lines (batch_id null —
+      // "sold IS the inventory") skip the check entirely; nothing is decremented.
       const weighed = lines.filter((l): l is SaleLineInput & {weight_kg: number; finished_goods_batch_id: string} => l.weight_kg !== null && l.finished_goods_batch_id !== null);
       for (const l of weighed) {
         const fg = await offlineDB.finishedGoods.get(l.finished_goods_batch_id);
@@ -125,8 +127,12 @@ export const posApi = {
 
     const payload = {
       p_branch_id: branchId,
-      p_lines: lines.map((l) => l.weight_kg === null
-        ? {product_id: l.product_id, bulk_price: l.unit_price}
+      // Owner directive (2026-07-15): manual weighed lines (weight_kg set but finished_goods_batch_id
+      // is null — "sold IS the inventory") route to the BULK server path with bulk_price = weight ×
+      // farm per-kg. The server's weighed path requires a real batch; the bulk path accepts null batch
+      // + records flat revenue with no inventory_movement (the sale itself is the inventory event).
+      p_lines: lines.map((l) => (l.weight_kg === null || l.finished_goods_batch_id === null)
+        ? {product_id: l.product_id, bulk_price: l.weight_kg !== null ? round2(l.weight_kg * l.unit_price) : l.unit_price}
         : {product_id: l.product_id, finished_goods_batch_id: l.finished_goods_batch_id, weight_kg: l.weight_kg}),
       p_tender_cash: tenderCash, p_idempotency_key: idem,
       p_sale_kind: kind, p_discount_rate: discountRate, p_delivery_fee: deliveryFee, p_customer_note: opts.note ?? null,
