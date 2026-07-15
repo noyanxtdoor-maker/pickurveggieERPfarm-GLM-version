@@ -48,7 +48,7 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
 | `vite build` | ✅ ok |
 | Cloud migration list (`supabase migration list --linked`) | ✅ **25 / 25 local = remote** (P1A+P1B pushed 2026-07-11) |
 | Cloud auth signup trigger (P1A `on_auth_user_created`) | ✅ verified — signup 200, identity created, email_confirmation required (expected) |
-| Vercel deployment (`https://pickurveggie-erp-glm.vercel.app/`) | ✅ 200 OK (re-verified 2026-07-14 — root + `/login` both HTTP 200 to anonymous curl; the prior "404 DEPLOYMENT_NOT_FOUND" conclusion was a misspelled-domain error, see §4 2026-07-14 entry) |
+| Vercel deployment (`https://pickurveggie-erp-glm.vercel.app/`) | ✅ 200 OK (re-verified 2026-07-14 — root + `/login` both HTTP 200 to anonymous curl; the prior "404 DEPLOYMENT_NOT_FOUND" conclusion was a misspelled-domain error, see §4 2026-07-14 entry). NOTE: 2026-07-15 four new commits (`f49c1d3` p1j username login, `5049285` p1k realtime auto-sync, `77d0b79` p1d payroll-role-link + managed positions + job_title, `38d90d8` p1f/p1g/p1h reject-pending + archive-revoked + employee-calendar) are pushed + CI green (#57,#58,#60) but NOT yet deployed — `vercel login` interactive auth blocked the autonomous deploy; see deploy runbook handoff §A6 |
 | Latest CI run on the feature branch (`a327cc9`, HEAD) | ✅ green (install · tsc · test · build · DB guards · secret scan) — CI for `13ee8c1` not yet audited (owner pastes Actions URL) |
 | CI runs a browser? | ❌ no — E2E is manual, mock-mode only |
 
