@@ -5,10 +5,12 @@
 import {useCallback, useEffect, useMemo, useState} from 'react';
 import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
-import {HandCoins, Link2, Users2, UserPlus, Wallet, X} from 'lucide-react';
+import {HandCoins, Link2, ListChecks, Users2, UserPlus, Wallet, X} from 'lucide-react';
 import {offlineDB} from '../../core/offline/db';
 import {usePermissions} from '../../core/permissions/permissions';
 import {useSync} from '../../core/offline/sync';
+import {useSession} from '../../core/auth/session';
+import {MOCK_MODE, DEMO} from '../../core/mock/mock';
 import {Button, Card, PageHeader, cn} from '../../components/ui';
 import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
@@ -28,7 +30,9 @@ export default function PayrollScreen() {
   const {notify} = useToast();
   const canRead = has('payroll.read');
   const canManage = has('payroll.manage');
+  const canManagePositions = has('position.manage');
   const {refreshTick} = useSync();
+  const {user} = useSession();
 
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
   const [branchId, setBranchId] = useState<string | undefined>(undefined);
@@ -54,12 +58,17 @@ export default function PayrollScreen() {
   useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs the roster/advance/wage lists (item 4 fan-out)
 
   const empName = useMemo(() => new Map((employees ?? []).map((e) => [e.id, e.name])), [employees]);
+  const activePositions = useMemo(() => positions.filter((p) => p.active), [positions]); // hire-form picklist = active only
 
   // ── hire ──
   const [hireOpen, setHireOpen] = useState(false);
   const [hName, setHName] = useState('');
   const [hPosId, setHPosId] = useState<string>(''); // P1D: position id (FK), empty = no position
   const [hRate, setHRate] = useState('550');
+
+  // ── position management (position.manage — co_owner/owner by default) ──
+  const [posManageOpen, setPosManageOpen] = useState(false);
+  const [newPosLabel, setNewPosLabel] = useState('');
 
   // ── advance ──
   const [advEmp, setAdvEmp] = useState<Employee | null>(null);
@@ -107,6 +116,26 @@ export default function PayrollScreen() {
     } catch (e) { notify(e instanceof Error ? e.message : 'Hire failed', 'error'); } finally { setBusy(false); }
   }
 
+  async function submitAddPosition() {
+    if (!companyId) return;
+    setBusy(true);
+    try {
+      await payrollApi.addPosition(companyId, newPosLabel, MOCK_MODE ? DEMO.userId : (user?.id ?? ''));
+      notify(`"${newPosLabel.trim()}" added`);
+      setNewPosLabel('');
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Could not add position', 'error'); } finally { setBusy(false); }
+  }
+
+  async function togglePosition(p: Position) {
+    setBusy(true);
+    try {
+      await payrollApi.setPositionActive(p, !p.active);
+      notify(p.active ? `"${p.label}" deactivated — hidden from new hires` : `"${p.label}" reactivated`);
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Update failed', 'error'); } finally { setBusy(false); }
+  }
+
   async function submitAdvance() {
     if (!companyId || !branchId || !advEmp) return;
     setBusy(true);
@@ -144,6 +173,7 @@ export default function PayrollScreen() {
           <div className="flex items-center gap-2">
             <div className="w-44"><SelectField value={branchId} onChange={setBranchId} placeholder="Paying branch" options={(branches ?? []).map((b) => ({value: b.id, label: b.name}))} /></div>
             {canManage ? <Button onClick={() => {setHName(''); setHPosId(''); setHRate('550'); setHireOpen(true);}}><UserPlus size={18} aria-hidden /> Hire Worker</Button> : null}
+            {canManagePositions ? <Button variant="secondary" onClick={() => setPosManageOpen(true)}><ListChecks size={18} aria-hidden /> Positions</Button> : null}
           </div>
         }
       />
@@ -242,7 +272,7 @@ export default function PayrollScreen() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Position</label>
-                  <SelectField value={hPosId} onChange={setHPosId} options={[{value: '', label: '— No position —'}, ...positions.map((p) => ({value: p.id, label: p.label}))]} />
+                  <SelectField value={hPosId} onChange={setHPosId} options={[{value: '', label: '— No position —'}, ...activePositions.map((p) => ({value: p.id, label: p.label}))]} />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="h-rate">Daily Rate (₱)</label>
@@ -253,6 +283,34 @@ export default function PayrollScreen() {
             <div className="mt-5 flex gap-2 border-t border-farm-accent-soft pt-4">
               <Button variant="secondary" onClick={() => setHireOpen(false)} disabled={busy}>Cancel</Button>
               <Button className="flex-1" onClick={() => void submitHire()} disabled={busy || !hName.trim() || !(parseFloat(hRate) > 0)}>{busy ? 'Adding…' : 'Add Worker'}</Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* Position management (position.manage — co_owner/owner by default; admin can only select, not manage) */}
+      <Dialog.Root open={posManageOpen} onOpenChange={setPosManageOpen}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-farm-card p-6 shadow-xl">
+            <div className="mb-1 flex items-center justify-between">
+              <Dialog.Title className="text-xl font-bold text-farm-green">Manage Positions</Dialog.Title>
+              <Dialog.Close className="rounded p-1 text-farm-muted hover:text-farm-ink" aria-label="Close"><X size={20} aria-hidden /></Dialog.Close>
+            </div>
+            <p className="mb-4 text-xs text-farm-muted">Deactivating a position hides it from new hires — existing Farm Hands already using it are unaffected.</p>
+            <ul className="mb-4 max-h-64 divide-y divide-farm-accent-soft overflow-y-auto">
+              {positions.map((p) => (
+                <li key={p.id} className={cn('flex items-center justify-between py-2 text-sm', !p.active && 'opacity-50')}>
+                  <span className="font-semibold">{p.label}</span>
+                  <button onClick={() => void togglePosition(p)} disabled={busy} className={cn('rounded-lg border px-2.5 py-1 text-xs font-bold', p.active ? 'border-red-200 bg-red-50 text-farm-danger hover:bg-red-100' : 'border-farm-accent bg-farm-bg text-farm-green hover:bg-farm-accent-soft')}>
+                    {p.active ? 'Deactivate' : 'Reactivate'}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <div className="flex gap-2 border-t border-farm-accent-soft pt-4">
+              <input value={newPosLabel} onChange={(e) => setNewPosLabel(e.target.value)} placeholder="New position name" className="min-h-12 flex-1 rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm" />
+              <Button onClick={() => void submitAddPosition()} disabled={busy || !newPosLabel.trim()}>Add</Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

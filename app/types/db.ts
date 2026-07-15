@@ -103,6 +103,7 @@ export type PermissionKey =
   | 'role.manage'
   | 'membership.manage'
   | 'job_title.manage' // P1D §Part3: descriptive job-title edit (admin-tier+ by default)
+  | 'position.manage' // P1D: manage the Farm Hand position picklist (co_owner/owner by default)
   | 'crop.manage'
   | 'product.manage'
   | 'inventory.opening'

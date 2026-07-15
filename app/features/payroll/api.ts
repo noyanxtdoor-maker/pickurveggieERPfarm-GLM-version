@@ -25,6 +25,9 @@ export interface Position {
   company_id: string;
   label: string;
   active: boolean;
+  created_by: string; // server-derived (positions_normalize_and_check trigger sets it from the actor)
+  created_at: string;
+  updated_at: string;
 }
 
 export interface HireInput {
@@ -37,9 +40,28 @@ export const payrollApi = {
   // P1D: fetch the company's active position picklist (positions table; deactive never deleted).
   async fetchPositions(companyId: string): Promise<Position[]> {
     if (MOCK_MODE) return []; // mock has no seeded positions; the form degrades to "no assignment"
-    const {data, error} = await supabase.from('positions').select('id, company_id, label, active').eq('company_id', companyId).eq('active', true).order('label');
+    // Return ALL positions (active + inactive) so the Position Management dialog can show + toggle
+    // inactive ones. The hire-form picklist filters to active client-side (activePositions).
+    const {data, error} = await supabase.from('positions').select('id, company_id, label, active, created_by, created_at, updated_at').eq('company_id', companyId).order('label');
     if (error) throw new Error(error.message);
     return (data ?? []) as Position[];
+  },
+
+  // P1D: add a new position to the picklist. created_by is server-derived (never client-supplied —
+  // see positions_normalize_and_check trigger); the createdBy client arg is unused on the wire (mock
+  // is a no-op — Repo B's Dexie schema has no positions store; positions are a real-DB surface only).
+  async addPosition(companyId: string, label: string, _createdBy: string): Promise<void> {
+    if (!label.trim()) throw new Error('Position name is required.');
+    if (MOCK_MODE) return; // mock has no positions store; fetchPositions returns [] in mock
+    const {error} = await supabase.from('positions').insert({company_id: companyId, label: label.trim()});
+    if (error) throw new Error(error.message);
+  },
+
+  // P1D: deactivate (never delete — the picklist preserves history). Active toggle.
+  async setPositionActive(position: Position, active: boolean): Promise<void> {
+    if (MOCK_MODE) return;
+    const {error} = await supabase.from('positions').update({active}).eq('id', position.id);
+    if (error) throw new Error(error.message);
   },
 
   async fetchEmployees(companyId: string): Promise<Employee[]> {
