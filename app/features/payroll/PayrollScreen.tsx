@@ -14,10 +14,14 @@ import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
 import {formatPeso, round2} from '../pos/money';
 import {payrollApi} from './api';
+import type {Position} from './api';
 import {membershipsApi, type MemberRow} from '../organization/memberships/memberships';
 import type {CashAdvance, Employee, WagePayment} from '../../types/db';
 
-const POSITIONS = ['Harvester', 'Farm Operator', 'Warehouse Packer', 'Delivery Driver'];
+// POSITIONS removed (P1D fix 2026-07-15): the picklist now comes from the live public.positions
+// table (company-managed, deactivate-never-delete) via payrollApi.fetchPositions. The old hardcoded
+// array was prototype-era and wired to a `position` text column that never existed post-P1D —
+// which is what made "Add Worker" throw the schema-cache error.
 
 export default function PayrollScreen() {
   const {companyId, has} = usePermissions();
@@ -33,6 +37,7 @@ export default function PayrollScreen() {
   }, [branches, branchId]);
 
   const [employees, setEmployees] = useState<Employee[] | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]); // P1D: live picklist from public.positions
   const [advances, setAdvances] = useState<CashAdvance[]>([]);
   const [wages, setWages] = useState<WagePayment[]>([]);
   const [busy, setBusy] = useState(false);
@@ -40,6 +45,7 @@ export default function PayrollScreen() {
   const reload = useCallback(() => {
     if (!companyId || !canRead) return;
     payrollApi.fetchEmployees(companyId).then(setEmployees).catch(() => setEmployees([]));
+    payrollApi.fetchPositions(companyId).then(setPositions).catch(() => setPositions([])); // P1D picklist
     if (branchId) {
       payrollApi.fetchAdvances(companyId, branchId).then(setAdvances).catch(() => setAdvances([]));
       payrollApi.fetchWages(companyId, branchId).then(setWages).catch(() => setWages([]));
@@ -52,7 +58,7 @@ export default function PayrollScreen() {
   // ── hire ──
   const [hireOpen, setHireOpen] = useState(false);
   const [hName, setHName] = useState('');
-  const [hPos, setHPos] = useState('Harvester');
+  const [hPosId, setHPosId] = useState<string>(''); // P1D: position id (FK), empty = no position
   const [hRate, setHRate] = useState('550');
 
   // ── advance ──
@@ -94,9 +100,9 @@ export default function PayrollScreen() {
     if (!companyId) return;
     setBusy(true);
     try {
-      await payrollApi.hire(companyId, {name: hName, position: hPos, dailyRate: parseFloat(hRate)});
+      await payrollApi.hire(companyId, {name: hName, positionId: hPosId || null, dailyRate: parseFloat(hRate)});
       notify(`${hName.trim()} hired`);
-      setHireOpen(false); setHName(''); setHRate('550');
+      setHireOpen(false); setHName(''); setHPosId(''); setHRate('550');
       reload();
     } catch (e) { notify(e instanceof Error ? e.message : 'Hire failed', 'error'); } finally { setBusy(false); }
   }
@@ -137,7 +143,7 @@ export default function PayrollScreen() {
         action={
           <div className="flex items-center gap-2">
             <div className="w-44"><SelectField value={branchId} onChange={setBranchId} placeholder="Paying branch" options={(branches ?? []).map((b) => ({value: b.id, label: b.name}))} /></div>
-            {canManage ? <Button onClick={() => {setHName(''); setHPos('Harvester'); setHRate('550'); setHireOpen(true);}}><UserPlus size={18} aria-hidden /> Hire Worker</Button> : null}
+            {canManage ? <Button onClick={() => {setHName(''); setHPosId(''); setHRate('550'); setHireOpen(true);}}><UserPlus size={18} aria-hidden /> Hire Worker</Button> : null}
           </div>
         }
       />
@@ -161,7 +167,7 @@ export default function PayrollScreen() {
                 {employees.map((e) => (
                   <tr key={e.id} className={cn('hover:bg-farm-bg/30', e.status !== 'Active' && 'opacity-50')}>
                     <td className="py-3"><span className="font-bold text-farm-green">{e.name}</span> <span className="font-mono text-[10px] text-farm-muted">{e.employee_code}</span></td>
-                    <td className="py-3 font-semibold text-farm-muted">{e.position}</td>
+                    <td className="py-3 font-semibold text-farm-muted">{e.position_label ?? '—'}</td>
                     <td className="tabular py-3 text-right font-semibold">{formatPeso(e.daily_rate)}/day</td>
                     <td className="py-3 text-right">
                       {e.advance_balance > 0
@@ -236,7 +242,7 @@ export default function PayrollScreen() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Position</label>
-                  <SelectField value={hPos} onChange={setHPos} options={POSITIONS.map((p) => ({value: p, label: p}))} />
+                  <SelectField value={hPosId} onChange={setHPosId} options={[{value: '', label: '— No position —'}, ...positions.map((p) => ({value: p.id, label: p.label}))]} />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="h-rate">Daily Rate (₱)</label>
@@ -377,7 +383,7 @@ function MyPayroll({companyId}: {companyId?: string}) {
           <Card className="flex flex-wrap items-center justify-between gap-4">
             <div>
               <p className="text-lg font-black text-farm-green">{me.name} <span className="font-mono text-xs text-farm-muted">{me.employee_code}</span></p>
-              <p className="text-sm font-semibold text-farm-muted">{me.position} · hired {me.date_hired}</p>
+              <p className="text-sm font-semibold text-farm-muted">{me.position_label ?? '—'} · hired {me.date_hired}</p>
             </div>
             <div className="text-right">
               <p className="text-[10px] font-bold uppercase text-farm-muted">Daily rate</p>

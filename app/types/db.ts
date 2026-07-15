@@ -350,7 +350,8 @@ export interface Employee {
   company_id: string;
   employee_code: string; // immutable after create
   name: string;
-  position: string;
+  position_id: string | null; // P1D: FK to public.positions (was `position` text pre-P1D — that column never existed post-migration; the bug you saw)
+  position_label?: string | null; // client-side augmentation: the positions.label for display (joined on fetch; absent in mock mode)
   daily_rate: number;
   date_hired: string; // date
   status: 'Active' | 'Inactive';

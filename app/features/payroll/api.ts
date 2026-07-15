@@ -20,13 +20,28 @@ async function mockAdvanceBalance(companyId: string, employeeId: string): Promis
   return round2(advs.reduce((s, a) => s + a.amount, 0) - wages.reduce((s, w) => s + w.ca_deducted, 0));
 }
 
+export interface Position {
+  id: string;
+  company_id: string;
+  label: string;
+  active: boolean;
+}
+
 export interface HireInput {
   name: string;
-  position: string;
+  positionId: string | null; // P1D: FK to public.positions (null = no position assigned)
   dailyRate: number;
 }
 
 export const payrollApi = {
+  // P1D: fetch the company's active position picklist (positions table; deactive never deleted).
+  async fetchPositions(companyId: string): Promise<Position[]> {
+    if (MOCK_MODE) return []; // mock has no seeded positions; the form degrades to "no assignment"
+    const {data, error} = await supabase.from('positions').select('id, company_id, label, active').eq('company_id', companyId).eq('active', true).order('label');
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Position[];
+  },
+
   async fetchEmployees(companyId: string): Promise<Employee[]> {
     if (MOCK_MODE) {
       const rows = await offlineDB.employees.where('company_id').equals(companyId).toArray();
@@ -34,14 +49,18 @@ export const payrollApi = {
       for (const r of rows) out.push({...r, advance_balance: await mockAdvanceBalance(companyId, r.id)});
       return out.sort((a, b) => Number(b.status === 'Active') - Number(a.status === 'Active') || a.name.localeCompare(b.name));
     }
-    const {data, error} = await supabase.from('employees').select('*').eq('company_id', companyId).order('name');
+    // P1D: join positions to get the label for display (one-level PostgREST nest).
+    const {data, error} = await supabase.from('employees').select('*, positions(label)').eq('company_id', companyId).order('name');
     if (error) throw new Error(error.message);
-    const rows = (data ?? []) as Array<Omit<Employee, 'advance_balance'>>;
+    const rows = (data ?? []) as Array<Employee & {positions: {label: string} | {label: string}[] | null}>;
     const out: Employee[] = [];
     for (const r of rows) {
-      const {data: bal, error: e2} = await supabase.rpc('employee_advance_balance', {p_employee_id: r.id});
+      const label = Array.isArray(r.positions) ? (r.positions[0]?.label ?? null) : (r.positions?.label ?? null);
+      const {position_label: _drop, advance_balance: _drop2, ...rest} = r;
+      void _drop; void _drop2; // strip client-side-only fields before passing to the balance RPC
+      const {data: bal, error: e2} = await supabase.rpc('employee_advance_balance', {p_employee_id: rest.id});
       if (e2) throw new Error(e2.message);
-      out.push({...r, daily_rate: Number(r.daily_rate), advance_balance: Number(bal ?? 0)});
+      out.push({...rest, position_label: label, daily_rate: Number(rest.daily_rate), advance_balance: Number(bal ?? 0)});
     }
     return out.sort((a, b) => Number(b.status === 'Active') - Number(a.status === 'Active') || a.name.localeCompare(b.name));
   },
@@ -50,7 +69,8 @@ export const payrollApi = {
     if (!input.name.trim()) throw new Error('Worker name is required.');
     if (!(input.dailyRate > 0)) throw new Error('Daily rate must be greater than ₱0.');
     const code = `EMP-${uuidv7().slice(-6).toUpperCase()}`;
-    const payload = {company_id: companyId, employee_code: code, name: input.name.trim(), position: input.position, daily_rate: round2(input.dailyRate), date_hired: todayISO()};
+    // P1D: send position_id (uuid FK to public.positions), not the old `position` text column.
+    const payload = {company_id: companyId, employee_code: code, name: input.name.trim(), position_id: input.positionId, daily_rate: round2(input.dailyRate), date_hired: todayISO()};
     if (MOCK_MODE) {
       const now = new Date().toISOString();
       await offlineDB.employees.put({id: uuidv7(), ...payload, status: 'Active', user_id: null, created_at: now, updated_at: now});
@@ -67,7 +87,7 @@ export const payrollApi = {
   async setActive(employee: Employee, active: boolean): Promise<void> {
     const status = active ? 'Active' : 'Inactive';
     if (MOCK_MODE) {
-      const {advance_balance: _drop, ...row} = employee;
+      const {advance_balance: _drop1, position_label: _drop2, ...row} = employee;
       await offlineDB.employees.put({...row, status, updated_at: new Date().toISOString()});
       return;
     }
@@ -104,7 +124,7 @@ export const payrollApi = {
   // P2-M5C: link/unlink a staff record to an app user (payroll self-visibility). Governed rpc; audited server-side.
   async linkEmployeeUser(employee: Employee, userId: string | null): Promise<void> {
     if (MOCK_MODE) {
-      const {advance_balance: _drop, ...row} = employee;
+      const {advance_balance: _drop1, position_label: _drop2, ...row} = employee;
       await offlineDB.employees.put({...row, user_id: userId, updated_at: new Date().toISOString()});
       return;
     }
