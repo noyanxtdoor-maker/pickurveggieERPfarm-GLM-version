@@ -44,7 +44,7 @@ _Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `
 | `supabase db reset` (25 migrations apply, incl. P1A+P1B) | ✅ clean (2026-07-11, re-verified after Docker restart) |
 | All guard batteries (behavioral SQL security tests, incl. P1A auth-lifecycle 7) | ✅ **179 PASS / 0 DEFECT** across 18 batteries (2026-07-11, re-verified after Docker restart) |
 | `tsc --noEmit` (type check) | ✅ clean |
-| `vitest` unit tests | ✅ **89 / 89** |
+| `vitest` unit tests | ✅ **22 files / 105 tests** (2026-07-15 re-verified after P1F/P1G/P1H; was 18/89 pre-2026-07-12, 20/96 after §3 #6, 22/105 after P1D+P1FGH) |
 | `vite build` | ✅ ok |
 | Cloud migration list (`supabase migration list --linked`) | ✅ **35 / 35 local = remote** (2026-07-15: 7 new migrations pushed via `npx supabase db push` — p1i retire-invitations, p1j username-login, p1k realtime-publication, p1d payroll-role-link, p1f reject-pending, p1g archive-revoked, p1h employee-calendar) |
 | Cloud auth signup trigger (P1A `on_auth_user_created`) | ✅ verified — signup 200, identity created, email_confirmation required (expected) |
