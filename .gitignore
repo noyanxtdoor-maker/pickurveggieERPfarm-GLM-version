@@ -20,5 +20,8 @@ graphify-out/
 # Supabase Studio SQL Editor auto-saves "private queries" here (exploration scratch, not source)
 supabase/snippets/
 
+# Database backups (pg_dump output — contains schema + possibly user data; never commit)
+backups/
+
 # Hermes agent working scratch (plans, etc. — session-local, not source)
 .hermes/
