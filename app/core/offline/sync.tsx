@@ -57,9 +57,15 @@ export function SyncProvider({children}: {children: ReactNode}) {
 
   // Manual sync (owner 2026-07-13): drains the outbox AND bumps refreshTick so every screen refetches.
   // A backup for auto-sync/real-time — never a replacement (those still fire on focus/reconnect).
+  // 2026-07-15 (item D): enforce a MINIMUM visible spin (~700ms) so the user sees the tap did something
+  // even when the outbox drains in <50ms — the prior instant-spin was imperceptible + the button's
+  // disabled={syncing} made it feel un-tappable. Button stays clickable; this just keeps the spinner
+  // visible long enough to register as feedback.
   const manualSync = useCallback(() => {
     triggerSync();
     setRefreshTick((t) => t + 1);
+    setSyncing(true);
+    setTimeout(() => setSyncing(false), 700);
   }, [triggerSync]);
 
   useEffect(() => {

@@ -22,6 +22,7 @@ import {
   Sparkles,
   Sun,
   UserCheck,
+  UserCircle,
 } from 'lucide-react';
 import {useSync} from '../../core/offline/sync';
 import {usePermissions} from '../../core/permissions/permissions';
@@ -50,6 +51,7 @@ const CORE_MODULES = [
   {to: '/copilot', label: 'VeggieGenius', icon: Sparkles, perms: undefined}, // CAP-VG1: advisory copilot (read-only, C7 §11)
   {to: '/reports', label: 'Reports', icon: BarChart3, perms: undefined},
   {to: '/settings', label: 'Settings Hub', icon: Settings, perms: undefined},
+  {to: '/profile', label: 'My Profile', icon: UserCircle, perms: undefined}, // self-service username/email/password (owner 2026-07-15)
 ] as const satisfies ReadonlyArray<{to: string; label: string; icon: typeof Activity; perms: readonly PermissionKey[] | undefined}>;
 
 const ORG_LINK = {
@@ -258,9 +260,8 @@ function TopBar() {
         </button>
         <button
           onClick={manualSync}
-          className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold', online ? 'text-farm-green' : 'text-farm-warn')}
+          className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold transition', online ? 'text-farm-green hover:bg-farm-accent-soft' : 'text-farm-warn')}
           title={syncing ? 'Syncing…' : online ? 'Online — tap to sync + refresh' : 'Offline'}
-          disabled={syncing}
         >
           {online ? <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} aria-hidden /> : <CloudOff size={18} aria-hidden />}
           {syncing ? <span className="text-xs">Syncing…</span> : null}

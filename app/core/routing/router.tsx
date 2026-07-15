@@ -27,6 +27,7 @@ const PayrollScreen = lazy(() => import('../../features/payroll/PayrollScreen'))
 const SchedulesScreen = lazy(() => import('../../features/scheduling/SchedulesScreen'));
 const ProjectsScreen = lazy(() => import('../../features/projects/ProjectsScreen'));
 const SettingsScreen = lazy(() => import('../../features/settings/SettingsScreen'));
+const ProfileScreen = lazy(() => import('../../features/profile/ProfileScreen'));
 const CopilotPanel = lazy(() => import('../../features/copilot/CopilotPanel'));
 const OperationsLayout = lazy(() => import('../../features/operations/OperationsLayout'));
 const CustomersScreen = lazy(() => import('../../features/customers/CustomersScreen'));
@@ -100,6 +101,9 @@ export const router = createBrowserRouter([
       {path: 'reports', element: <Placeholder title="Reports" />},
       {path: 'copilot', element: <CopilotPanel />},
       {path: 'settings', element: <SettingsScreen />},
+      // Profile (owner 2026-07-15): self-service username/email/password for EVERYONE (no permission
+      // gate — self, not governed admin action). The OTP password-change flow moved here from Settings.
+      {path: 'profile', element: <ProfileScreen />},
     ],
   },
   {path: '*', element: <Navigate to="/dashboard" replace />},
