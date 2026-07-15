@@ -42,6 +42,13 @@ export const authApi = {
     if (MOCK_MODE) await offlineDB.meta.put({key: 'mock-pending-approved', value: true});
   },
 
+  // P1F: turn away a pending signup (account_status -> Suspended; never a hard-delete).
+  async rejectPendingUser(userId: string): Promise<void> {
+    if (MOCK_MODE) { await offlineDB.meta.put({key: `mock-rejected-${userId}`, value: true}); return; }
+    const {error} = await supabase.rpc('reject_pending_user', {p_user_id: userId});
+    if (error) throw new Error(error.message);
+  },
+
   // Admin-assisted recovery (B7 §2): triggers the same self-service reset email for a member who is locked
   // out. The link lands on /auth/reset; the admin never handles the password.
   async sendRecoveryEmail(email: string): Promise<void> {

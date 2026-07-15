@@ -7,6 +7,7 @@ import {Plus} from 'lucide-react';
 import {supabase} from '../../../core/supabase/client';
 import {offlineDB} from '../../../core/offline/db';
 import {enqueue} from '../../../core/offline/queue';
+import {uuidv7} from '../../../core/offline/uuidv7';
 import {usePermissions} from '../../../core/permissions/permissions';
 import {useSync} from '../../../core/offline/sync';
 import {MOCK_MODE, mockUsers} from '../../../core/mock/mock';
@@ -21,6 +22,8 @@ export interface MemberRow extends Membership {
   userName: string;
   branchName: string;
   roleKey: string;
+  jobTitle: string | null; // P1D §Part3: purely descriptive — see membershipsApi.setJobTitle
+  accountStatus: 'Active' | 'Suspended' | 'Archived'; // P1G: account-level, distinct from assignment_status
 }
 
 // Directory dedupe (owner 2026-07-15, fixes the "role change creates a new account" bug):
@@ -59,20 +62,22 @@ export const membershipsApi = {
       const bm = new Map(brs.map((b) => [b.id, b.name]));
       const rm = new Map(rls.map((r) => [r.id, r.role_key]));
       const um = new Map(users.map((u) => [u.id, u.display_name]));
-      const mapped = mems.map((m) => ({...m, userName: um.get(m.user_id) ?? '(demo user)', branchName: bm.get(m.branch_id) ?? m.branch_id, roleKey: rm.get(m.role_id) ?? m.role_id}));
+      const mapped = mems.map((m) => ({...m, userName: um.get(m.user_id) ?? '(demo user)', branchName: bm.get(m.branch_id) ?? m.branch_id, roleKey: rm.get(m.role_id) ?? m.role_id, jobTitle: null, accountStatus: 'Active' as const}));
       return dedupeByUser(mapped);
     }
     const {data, error} = await supabase
       .from('user_branch_roles')
-      .select('*, users(display_name), branches(name), roles(role_key)')
+      .select('*, users(display_name, job_title, account_status), branches(name), roles(role_key)')
       .eq('company_id', companyId);
     if (error) throw new Error(error.message);
-    type Row = Membership & {users: {display_name: string} | null; branches: {name: string} | null; roles: {role_key: string} | null};
+    type Row = Membership & {users: {display_name: string; job_title: string | null; account_status: 'Active' | 'Suspended' | 'Archived'} | null; branches: {name: string} | null; roles: {role_key: string} | null};
     const mapped = ((data ?? []) as Row[]).map((r) => ({
       ...r,
       userName: r.users?.display_name ?? '(unknown)',
       branchName: r.branches?.name ?? r.branch_id,
       roleKey: r.roles?.role_key ?? r.role_id,
+      jobTitle: r.users?.job_title ?? null,
+      accountStatus: r.users?.account_status ?? 'Active',
     }));
     return dedupeByUser(mapped);
   },
@@ -87,6 +92,63 @@ export const membershipsApi = {
   },
   update(m: Membership, input: MembershipEditInput) {
     return enqueue({companyId: m.company_id, kind: 'membership.update', request: {type: 'update', table: 'user_branch_roles', match: {id: m.id, baseUpdatedAt: m.updated_at}, payload: input}});
+  },
+
+  // P1D §Part3: purely descriptive — job_title.manage required server-side. No payroll/reporting keyed to it.
+  async setJobTitle(userId: string, jobTitle: string): Promise<void> {
+    if (MOCK_MODE) return; // mock users are curated demo fixtures — not editable here
+    const {error} = await supabase.from('users').update({job_title: jobTitle.trim() || null}).eq('id', userId);
+    if (error) throw new Error(error.message);
+  },
+
+  // P1D §Part1: the one governed entry point for approving a pending sign-up OR reassigning an existing
+  // member — atomically links (or exempts) payroll for an eligible (rank<40) role. ONLINE ONLY
+  // (not idempotent-safe for outbox retry: a retried call after a partial network failure could
+  // double-create the Farm Hand record).
+  async assignWithPayroll(companyId: string, input: {
+    userId: string; branchId: string; roleId: string;
+    employeeName?: string; positionId?: string; dailyRate?: number; exempt?: boolean;
+  }): Promise<void> {
+    if (MOCK_MODE) {
+      const now = new Date().toISOString();
+      const existing = await offlineDB.memberships.where('company_id').equals(companyId).filter((r) => r.user_id === input.userId && r.assignment_status === 'Active').first();
+      if (existing) await offlineDB.memberships.put({...existing, assignment_status: 'Expired', updated_at: now});
+      await offlineDB.memberships.put({id: uuidv7(), user_id: input.userId, company_id: companyId, branch_id: input.branchId, role_id: input.roleId, assignment_status: 'Active', expires_at: null, created_at: now, updated_at: now});
+      if (input.employeeName && input.positionId && input.dailyRate) {
+        await offlineDB.employees.put({id: uuidv7(), company_id: companyId, employee_code: `EMP-${uuidv7().slice(-6).toUpperCase()}`, name: input.employeeName, position_id: input.positionId, daily_rate: input.dailyRate, date_hired: now.slice(0, 10), status: 'Active', user_id: input.userId, created_at: now, updated_at: now});
+      } else if (input.exempt) {
+        await offlineDB.meta.put({key: `payroll-exempt-${input.userId}`, value: true});
+      }
+      return;
+    }
+    const {error} = await supabase.rpc('assign_membership_with_payroll', {
+      p_company_id: companyId, p_target_user_id: input.userId, p_branch_id: input.branchId, p_role_id: input.roleId,
+      // `|| null`, not `?? null`: for a non-payroll-eligible role (co_owner/owner) the Position field
+      // never renders, so positionId stays '' (its initial state) rather than undefined — '' is defined
+      // so ?? lets it through, and Postgres then fails casting empty-string to uuid. || catches that.
+      p_employee_name: input.employeeName ?? null, p_position_id: input.positionId || null, p_daily_rate: input.dailyRate ?? null,
+      p_exempt: input.exempt ?? false,
+    });
+    if (error) throw new Error(error.message);
+  },
+
+  async unlinkedPayrollEligible(companyId: string): Promise<Array<{user_id: string; display_name: string; role_key: string}>> {
+    if (MOCK_MODE) return [];
+    const {data, error} = await supabase.rpc('list_unlinked_payroll_eligible', {p_company_id: companyId});
+    if (error) throw new Error(error.message);
+    return (data ?? []) as Array<{user_id: string; display_name: string; role_key: string}>;
+  },
+
+  // P1G: retire a fully-Active account (never a hard-delete — auto-revokes all memberships in one call).
+  async archiveUser(userId: string): Promise<void> {
+    if (MOCK_MODE) return;
+    const {error} = await supabase.rpc('archive_user_account', {p_user_id: userId});
+    if (error) throw new Error(error.message);
+  },
+  async unarchiveUser(userId: string): Promise<void> {
+    if (MOCK_MODE) return;
+    const {error} = await supabase.rpc('unarchive_user_account', {p_user_id: userId});
+    if (error) throw new Error(error.message);
   },
 };
 
