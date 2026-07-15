@@ -148,6 +148,97 @@ Both must print `HTTP 200`. If either prints `404 DEPLOYMENT_NOT_FOUND`, double-
 
 Vercel keeps the prior production deployment. From the dashboard at https://vercel.com/your-team/~/pickurveggie-erp-glm/deployments click the prior deployment and "Promote to Production." Roll back the DB migrations by writing a REVERSAL migration — do NOT edit the committed migrations (per AGENTS §2 "Migrations are immutable once committed"). Reach me / Team B for a rollback-specific migration + guard.
 
+## §A7 — Backups + DR restore drill (launch gate #7) — owner-runnable runbook
+
+Supabase free tier = daily backups only (managed by Supabase, not under your direct control). PITR (point-in-time-recovery) needs a paid plan — decide at launch whether to upgrade. Either way, AGENTS §2 launch gate #7 + §4 #3 demand a manual snapshot you control + a tested restore drill. "A backup never restored is only a theory."
+
+### One-shot snapshot (you run this when you have the DB password)
+
+```bash
+# From repo root. Password = the value the owner provides per session (never stored).
+# The CLI's `--linked` connection respects Supabase's pooler; for a raw pg_dump use the session-pooler
+# FQDN only IF it resolves (Repo B had tenant-not-found issues — if so, fall back to `npx supabase db remote commit`).
+PGPASSWORD='<owner-provided-db-password>' \
+  pg_dump --host=aws-0-ap-southeast-2.pooler.supabase.com \
+          --port=5432 \
+          --username=postgres.jabjyvdkadcbfocaerno \
+          --dbname=postgres \
+          --format=custom \
+          --file="backups/snapshot-$(date +%Y%m%d-%H%M%S).dump"
+```
+If the pooler FQDN fails with ENOTFOUND / tenant-not-found (it has before for this project — see memory + handoff §3), the working alternative is the Supabase CLI's own dump path or the dashboard "Backups" UI download. The point of this section is: keep a snapshot file YOU control outside Supabase, on your own disk or cloud.
+
+File target: `backups/` (gitignored — never commit a dump). Every snapshot should be small enough to inspect (~5–30 MB depending on seed data; the dev pg_dump referenced in STATUS §4 was 901 KB pre-P1D).
+
+### Restore drill (the actual launch item — must be tested once before launch)
+
+Drill = restore the snapshot to a FRESH database + verify a critical path still works in isolation. The point is to PROVE the snapshot is restorable, not to keep the drill database around.
+
+```bash
+# 1. Create a fresh throwaway database (local docker is fine) — do NOT restore onto prod
+docker run --rm -d --name drill-db -e POSTGRES_PASSWORD=drillpw -p 55432:5432 postgres:15-alpine
+# 2. Restore the snapshot onto it
+PGPASSWORD=drillpw pg_restore --host=localhost --port=55432 --username=postgres --dbname=postgres --clean --if-exists "backups/snapshot-YYYYMMDD-HHMMSS.dump"
+# 3. Verify a few critical facts are present (run from inside the drill db)
+docker exec -i drill-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 <<'EOF'
+  SELECT count(*) AS migration_count FROM supabase_migrations.schema_migrations;  -- expect 35
+  SELECT count(*) AS positions_table FROM information_schema.tables WHERE table_name='positions' AND table_schema='public';  -- expect 1
+  SELECT count(*) AS assign_payroll_fn FROM information_schema.routines WHERE routine_name='assign_membership_with_payroll';  -- expect 1
+EOF
+# 4. Tear down the drill — never keep it running
+docker stop drill-db
+```
+
+Estimated time: 15 min. Do this once before launch + record the date + drill-result in STATUS.md §1. After that, schedule a monthly restore drill (Launch_Runbook §4 #3).
+
+### Decision you owe before launch: Supabase free-tier daily backups vs paid PITR
+
+Free tier = 1 daily snapshot held by Supabase (you don't control timing or retention, and you can only restore from their dashboard). PITR = paid plan ($25/mo at time of writing) = restore to ANY second in the last 7 days + your own restore point. For a real ERP with money paths, PITR is the AGENTS §2-aligned choice; for pre-launch dev/staging, daily is fine. Make the call + record it in STATUS.
+
+## §A8 — MFA enrollment for privileged roles (ODR-003, launch gate #4) — owner-runnable runbook
+
+MFA is a Supabase dashboard toggle + an owner-enrollment step. The app-side enforcement UI (forcing a redirect to /auth/mfa-enroll if the user's session lacks an `aal2` factor) is a follow-up, not a launch-blocker — the toggle + owner enrollment is the launch item.
+
+### Step-by-step (you, in the Supabase dashboard)
+
+1. Supabase dashboard → https://supabase.com/dashboard/project/jabjyvdkadcbfocaerno/auth/mfa
+2. Toggle **Enable MFA** (this enables the MFA API for the project — does NOT force it on any user yet).
+3. Enroll yourself first: in a browser at https://pickurgeggie-erp-glm.vercel.app, complete the MFA enrollment flow for your owner account (the app may need to expose an enroll screen — check `app/features/auth/`; if no enroll screen exists, use the Supabase dashboard "User Management" → your user → "Enroll MFA").
+4. Verify by signing out + back in — you should be prompted for the TOTP code.
+5. Enroll at least one other privileged user (co_owner if you have one) the same way.
+6. **Do NOT enable "Enforce MFA for all users" yet** — that's the post-launch hardening step, after non-privileged staff have had a chance to enroll. For launch, MFA on privileged roles (owner + co_owner) is the AGENTS §2 gate.
+7. Record the MFA-enabled date + the count of privileged users enrolled in STATUS.md §1.
+
+### App-side enforcement UI (DEFERRED — follow-up, not a launch gate)
+
+A "force enroll on next sign-in" gate (`if session.user.aal_level < 'aal2' && hasRole(['owner','co_owner',...]) → redirect('/auth/mfa-enroll')`) belongs in `app/core/auth/session.tsx` or a `RequireMfa` wrapper component around the AppShell. Build this AFTER launch as part of the §4 post-launch hardening. AGENTS §6 lists this as a follow-up; it is NOT in the §3 launch-blocker list.
+
+## §A9 — Cross-vendor review coordination (P1D + B2A — launch gate #1)
+
+These are process gates, not build items — they require a different-AI-or-human reviewer's GO before the work is considered fully launched. Per AGENTS §2 "Money paths are gated" + memory rule (money-path gate non-transitivity) the owner's "JUST GO" lifted the owner-GO gate on deploy but did NOT waive cross-vendor review.
+
+### P1D (URGENT — P1D is live in production)
+
+Files for Team A (Fable 5 / Opus 4.8) to review — all on origin under `feature/phase-0-foundation`:
+1. `supabase/migrations/20260715120000_p1d_payroll_role_link.sql` (347 lines) — the migration
+2. `scripts/guards/payroll-role-link-security.sql` (253 lines, 15/15 PASS first-run) — the behavioral battery
+3. `docs/handoffs-for-team-b/006-...md` §1c — the port spec + provenance
+
+Specifically confirm:
+- `assign_membership_with_payroll()` atomicity — the guard proves employee + membership created in the same txn OR nothing (Test 7). Verify by reading the function body: exception inside the membership block aborts the whole txn (subtransaction rollback).
+- Partial-unique-index fix on `user_branch_roles` (Test 8) — the latent M3 bug where reassigning a user to a role they previously held created a duplicate-assignment row. Now guarded by partial index WHERE `assignment_status='Active'`.
+- `users_job_title_guard()` trigger closes the OR-policy self-edit hole (Test 15) — self-edit blocked at the DB layer, not just in UI.
+- `outranks_role` co_owner cannot appoint owner (Tests 10 + 11) — confirmed at SQL level.
+- Exempt path + co_owner/owner skip payroll (rank >= 40, Tests 9 + 12).
+
+### B2A digital payments lock review
+
+Team A: hand them `docs/28_Enterprise_Architecture_Audit/Phase_2_B2A_Lock_Review_Request.md`. On their GO + your owner sign-off, B2A locks. (If Repo B has not yet ported B2A from Repo A, that's the port target — re-implement for Repo B's own migration chain, do NOT clone Repo A's migration numbering/SHAs.)
+
+---
+
+_Conventions: the runbooks above are owner-runnable. The agent can write the scripts but cannot run them without (a) the DB password for backups, (b) the Supabase dashboard for MFA, (c) the cross-vendor reviewer for the P1D/B2A reviews. None of these are agent-buildable — they're inherently human/process-gated and that's expected per AGENTS §2, not a failure._
+
 ### When you're done
 
 Tell me (Team B) the deployment URL + the new remote migration count (expected 31/31 local=remote). I'll update STATUS.md §1 ("Cloud migration list") + the "Vercel deployment" row to flip from "NOT yet deployed" to the new verified state, and queue the cross-vendor review request for P1D's `assign_membership_with_payroll` (per §4 above).
