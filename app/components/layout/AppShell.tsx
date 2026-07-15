@@ -22,7 +22,6 @@ import {
   Sparkles,
   Sun,
   UserCheck,
-  Wifi,
 } from 'lucide-react';
 import {useSync} from '../../core/offline/sync';
 import {usePermissions} from '../../core/permissions/permissions';
@@ -262,7 +261,7 @@ function TopBar() {
           className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold', online ? 'text-farm-green' : 'text-farm-warn')}
           title={online ? 'Online — tap to sync + refresh' : 'Offline'}
         >
-          {online ? <Wifi size={18} aria-hidden /> : <CloudOff size={18} aria-hidden />}
+          {online ? <RefreshCw size={18} aria-hidden /> : <CloudOff size={18} aria-hidden />}
           {syncing ? <RefreshCw size={16} className="animate-spin" aria-hidden /> : null}
           {pending > 0 ? <span className="rounded-full bg-amber-200 px-2 text-amber-900">{pending}</span> : null}
         </button>
