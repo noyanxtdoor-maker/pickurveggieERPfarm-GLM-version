@@ -35,8 +35,10 @@ type Tab = 'signin' | 'signup';
 // Email OR username — see the file header on why only email authenticates for now.
 const signinSchema = z.object({identifier: z.string().min(1, 'Enter your email or username'), password: z.string().min(1, 'Required')});
 // B7 §2: minimum length ≥12, passphrase-friendly (no forced symbol rules)
+// P1M (2026-07-16, owner directive): username/name is NO LONGER collected at sign-up — sign-up is
+// email + password only. After the owner approves the account, the user is redirected to an
+// onboarding screen where THEY choose their own username (game/bank-style). See set_chosen_username.
 const signupSchema = z.object({
-  displayName: z.string().min(2, 'Enter your name'),
   email: z.string().email('Enter a valid email'),
   password: z.string().min(12, 'At least 12 characters — a short sentence works well'),
 });
@@ -166,21 +168,16 @@ export default function Login() {
           ) : (
             <form className="space-y-4" onSubmit={su.handleSubmit(async (v) => {
               setError(null);
-              const res = await signUp(v.email, v.password, v.displayName);
+              // P1M (2026-07-16): name no longer collected at sign-up — post-approval, the user picks
+              // their own username on the ChooseUsername onboarding screen. Pass empty display_name;
+              // the auth trigger auto-derives a placeholder from the email prefix until they choose.
+              const res = await signUp(v.email, v.password, '');
               if (res.error) {setError(res.error); return;}
               switchTab('signin');
               setNotice(res.needsConfirmation
                 ? 'Almost there — confirm your email via the link we sent, then sign in. An admin will approve your access.'
                 : 'Account created. An admin will approve your access shortly.');
             })}>
-              <div>
-                <label className={darkLabelCls} htmlFor="su-name">Your name</label>
-                <div className="relative">
-                  <UserIcon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" aria-hidden />
-                  <input id="su-name" autoComplete="name" placeholder="e.g. Maria" className={darkInputCls} {...su.register('displayName')} />
-                </div>
-                {su.formState.errors.displayName ? <p className="mt-1 text-xs text-red-400">{su.formState.errors.displayName.message}</p> : null}
-              </div>
               <div>
                 <label className={darkLabelCls} htmlFor="su-email">Email</label>
                 <div className="relative">
