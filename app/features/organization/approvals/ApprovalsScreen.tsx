@@ -23,6 +23,7 @@ import {membershipsApi, type MemberRow} from '../memberships/memberships';
 import {authApi, type PendingUser} from '../../auth/api';
 import {payrollApi} from '../../payroll/api';
 import {OverridesDialog} from '../overrides/overrides';
+import {revokeRequestsApi, type RevokeRequest} from '../revoke-requests/revokeRequests';
 import {MOCK_MODE, DEMO} from '../../../core/mock/mock';
 
 // P1D §Part1: rank<40 (below co_owner) = a role that implies paid work — approving/assigning it requires
@@ -78,11 +79,16 @@ export default function ApprovalsScreen() {
   const [rows, setRows] = useState<MemberRow[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [revokeTarget, setRevokeTarget] = useState<MemberRow | null>(null);
+  const [revokeReason, setRevokeReason] = useState('');
   const [rejectTarget, setRejectTarget] = useState<PendingUser | null>(null);
   const [overrideTarget, setOverrideTarget] = useState<MemberRow | null>(null);
 
   // P1A: the self-signup approval queue (server: list_pending_users, membership.manage-gated)
   const [pending, setPending] = useState<PendingUser[] | null>(null);
+  // P1J (2026-07-16): the revoke-approval queue (server: list_revoke_requests, membership.manage-gated).
+  // Any co_owner/owner may REQUEST a revoke; a DIFFERENT co_owner/owner must APPROVE/REJECT it
+  // (separation of duties). The box only renders when this queue is non-empty (owner spec).
+  const [revokeReqs, setRevokeReqs] = useState<RevokeRequest[] | null>(null);
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
 
   // P1D §Part1: the unified approve/reassign dialog — see AssignTarget above.
@@ -100,6 +106,7 @@ export default function ApprovalsScreen() {
     if (!companyId) return;
     membershipsApi.fetch(companyId).then(setRows).catch(() => setRows([]));
     if (canManage) authApi.listPendingUsers().then(setPending).catch(() => setPending([]));
+    if (canManage) revokeRequestsApi.list().then(setRevokeReqs).catch(() => setRevokeReqs([]));
     if (canManage) payrollApi.fetchPositions(companyId).then(setPositions).catch(() => setPositions([]));
     if (canManage) membershipsApi.unlinkedPayrollEligible(companyId).then((rows) => setUnlinkedEligible(new Set(rows.map((r) => r.user_id)))).catch(() => setUnlinkedEligible(new Set()));
     // Real mode on a fresh device: the branch/role dropdowns read the Dexie cache, which is empty until the
@@ -235,6 +242,34 @@ export default function ApprovalsScreen() {
       notify(status === 'Expired' ? `${m.userName}'s access revoked` : `${m.userName} reactivated`);
       reload();
     } catch (e) { notify(e instanceof Error ? e.message : 'Update failed', 'error'); } finally { setBusy(false); }
+  }
+
+  // P1J (2026-07-16): queue a revoke REQUEST — does NOT execute the revoke. A different
+  // co_owner/owner must approve it from the "Pending Revoke Approvals" box (separation of duties).
+  async function requestRevoke(m: MemberRow, reason: string) {
+    setBusy(true);
+    try {
+      await revokeRequestsApi.request(m.user_id, reason);
+      notify(`Revoke request queued for ${m.userName} — another owner/co_owner must approve it`);
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Request failed', 'error'); } finally { setBusy(false); }
+  }
+  async function approveRevoke(req: RevokeRequest) {
+    setBusy(true);
+    try {
+      await revokeRequestsApi.approve(req.id);
+      await triggerSync();
+      notify(`${req.target_name}'s access revoked (request approved)`);
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Approve failed', 'error'); } finally { setBusy(false); }
+  }
+  async function rejectRevoke(req: RevokeRequest) {
+    setBusy(true);
+    try {
+      await revokeRequestsApi.reject(req.id, 'Not approved at this time');
+      notify('Revoke request rejected');
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Reject failed', 'error'); } finally { setBusy(false); }
   }
 
   // P1G/P1G.1: retire an account so it drops off the day-to-day directory — auto-revokes any access it
@@ -451,15 +486,73 @@ export default function ApprovalsScreen() {
         </p>
       </Card>
 
-      <ConfirmDialog
-        open={revokeTarget !== null}
-        title={revokeTarget ? `Revoke ${revokeTarget.userName}'s access?` : ''}
-        description="Their assignment becomes Expired and they lose access immediately. You can reactivate later — nothing is deleted."
-        confirmLabel="Revoke access"
-        danger
-        onCancel={() => setRevokeTarget(null)}
-        onConfirm={async () => {if (revokeTarget) await setStatus(revokeTarget, 'Expired'); setRevokeTarget(null);}}
-      />
+      {/* P1J (2026-07-16): Revoke is now a REQUEST — not a unilateral action. A co_owner/owner
+          queues it here with a reason; a DIFFERENT co_owner/owner approves it from the
+          "Pending Revoke Approvals" box below (separation of duties). The server enforces both
+          gates (membership.manage + approver != requester) — see scripts/guards/p1j-revoke-approval-security.sql. */}
+      <Dialog.Root open={revokeTarget !== null} onOpenChange={(o) => {if (!o) {setRevokeTarget(null); setRevokeReason('');}}}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-farm-card p-6 shadow-xl">
+            <Dialog.Title className="mb-2 text-lg font-bold text-farm-danger">
+              {revokeTarget ? `Request revoke for ${revokeTarget.userName}?` : ''}
+            </Dialog.Title>
+            <Dialog.Description className="mb-4 text-sm text-farm-muted">
+              This queues a revoke request. Another owner/co_owner must approve it — you cannot approve your own request. Their access stays until then.
+            </Dialog.Description>
+            <textarea
+              value={revokeReason}
+              onChange={(e) => setRevokeReason(e.target.value)}
+              placeholder="Reason for revoke (required) — e.g. end of contract, role change"
+              rows={3}
+              className="min-h-20 w-full resize-none rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-2 text-sm"
+              aria-label="Reason for revoke"
+            />
+            <div className="mt-5 flex gap-2 border-t border-farm-accent-soft pt-4">
+              <Button variant="secondary" onClick={() => {setRevokeTarget(null); setRevokeReason('');}} disabled={busy}>Cancel</Button>
+              <Button
+                className="flex-1"
+                disabled={busy || revokeReason.trim().length < 3}
+                onClick={() => {const r = revokeTarget; const reason = revokeReason; setRevokeTarget(null); setRevokeReason(''); if (r) void requestRevoke(r, reason);}}
+              >
+                {busy ? 'Queuing…' : 'Queue revoke request'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
+      {/* P1J (2026-07-16): the Pending Revoke Approvals box — mirrors Pending Account Approvals.
+          Renders ONLY when revokeReqs has rows (owner spec: "only appear when there's a pending revoke"). */}
+      {canManage && revokeReqs != null && revokeReqs.length > 0 ? (
+        <Card>
+          <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-farm-warn"><Clock3 className="h-5 w-5" aria-hidden /> Pending Revoke Approvals</h3>
+          <p className="mb-3 text-xs text-farm-muted">A co_owner/owner queued these revoke requests. A DIFFERENT co_owner/owner must approve or reject each — you cannot approve your own request. Approving immediately sets the account's memberships to Expired.</p>
+          <ul className="divide-y divide-farm-accent-soft">
+            {revokeReqs.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div>
+                  <p className="text-sm font-bold text-farm-ink">{r.target_name}</p>
+                  <p className="text-xs text-farm-muted">
+                    Requested by {r.requester_name} · {new Date(r.created_at).toLocaleDateString('en-PH', {month: 'short', day: 'numeric'})}
+                  </p>
+                  <p className="mt-0.5 text-xs italic text-farm-muted">“{r.reason}”</p>
+                </div>
+                <span className="flex gap-1.5">
+                  <button onClick={() => void approveRevoke(r)} disabled={busy}
+                    className="rounded-lg bg-farm-danger px-3 py-1.5 text-xs font-bold text-white hover:opacity-90">
+                    Approve revoke
+                  </button>
+                  <button onClick={() => void rejectRevoke(r)} disabled={busy}
+                    className="rounded-lg border border-farm-accent bg-farm-bg px-3 py-1.5 text-xs font-bold text-farm-green hover:bg-farm-accent-soft">
+                    Reject
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
 
       <ConfirmDialog
         open={archiveTarget !== null}
