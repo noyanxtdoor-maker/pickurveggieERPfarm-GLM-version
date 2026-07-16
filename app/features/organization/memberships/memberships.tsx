@@ -17,6 +17,7 @@ import {Button, Card, PageHeader, cn} from '../../../components/ui';
 import {Field, TextInput, zodResolver} from '../../../components/forms';
 import {SelectField, ConfirmDialog} from '../../../components/overlay';
 import {EmptyState, Skeleton, StatusBadge, useToast} from '../../../components/feedback';
+import {ModuleAccessDialog} from '../overrides/ModuleAccessDialog';
 
 export interface MemberRow extends Membership {
   userName: string;
@@ -158,6 +159,7 @@ export default function MembersScreen() {
   const [rows, setRows] = useState<MemberRow[] | null>(null);
   const [selected, setSelected] = useState<string | 'new' | null>(null);
   const canManage = has('membership.manage');
+  const [accessFor, setAccessFor] = useState<MemberRow | null>(null);
 
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).toArray() : []), [companyId]);
   const roles = useLiveQuery(async () => (companyId ? offlineDB.roles.where('company_id').equals(companyId).toArray() : []), [companyId]);
@@ -196,12 +198,16 @@ export default function MembersScreen() {
           {selected === 'new' ? (
             <AssignMembership companyId={companyId} branchOpts={(branches ?? []).map((b) => ({value: b.id, label: b.name}))} roleOpts={(roles ?? []).map((r) => ({value: r.id, label: r.role_key}))} onDone={() => {setSelected(null); triggerSync(); reload();}} />
           ) : current ? (
-            <EditMembership member={current} canManage={canManage} onDone={() => {triggerSync(); reload();}} />
+            <EditMembership member={current} canManage={canManage} onOpenAccess={() => setAccessFor(current)} onDone={() => {triggerSync(); reload();}} />
           ) : (
             <Card><p className="p-4 text-lg text-farm-muted">Select a member, or assign a new one.</p></Card>
           )}
         </div>
       </div>
+      {companyId ? <ModuleAccessDialog
+        companyId={companyId} userName={accessFor?.userName ?? ''} userId={accessFor?.user_id ?? ''}
+        open={accessFor !== null} onClose={() => setAccessFor(null)}
+      /> : null}
     </div>
   );
 }
@@ -224,7 +230,7 @@ function AssignMembership({companyId, branchOpts, roleOpts, onDone}: {companyId:
   );
 }
 
-function EditMembership({member, canManage, onDone}: {member: MemberRow; canManage: boolean; onDone: () => void}) {
+function EditMembership({member, canManage, onOpenAccess, onDone}: {member: MemberRow; canManage: boolean; onOpenAccess: () => void; onDone: () => void}) {
   const {notify} = useToast();
   const {register, handleSubmit, control, formState: {errors, isSubmitting}} = useForm<MembershipEditInput>({
     resolver: zodResolver(membershipEditSchema),
@@ -250,6 +256,14 @@ function EditMembership({member, canManage, onDone}: {member: MemberRow; canMana
         <Button type="submit" disabled={!canManage || isSubmitting}>Save</Button>
         {!canManage ? <p className="text-base text-farm-muted">Needs membership.manage to edit.</p> : null}
       </form>
+      {/* P1C2 (item C): merged 3-state module-access panel — opens one dialog with 8 module toggles
+          (Not Visible / View-only / Edit & Manage) per user. */}
+      {canManage ? (
+        <div className="mt-5 border-t border-farm-accent-soft pt-4">
+          <Button variant="secondary" onClick={onOpenAccess}>Set module access</Button>
+          <p className="mt-2 text-xs text-farm-muted">Per-module tier (Not Visible / View-only / Edit & Manage) writes the underlying key overrides.</p>
+        </div>
+      ) : null}
       <ConfirmDialog
         open={confirm !== null}
         title="Update membership?"
