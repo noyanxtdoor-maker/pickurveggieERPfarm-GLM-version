@@ -1,13 +1,15 @@
 // Route tree (M1C §3) with auth + permission guards. Feature screens are LAZY-loaded (M1B F1) so the initial
 // bundle is just the shell + session; modules load on demand. Bootstrap is intentionally absent (operator-only).
-import {lazy, type ReactNode} from 'react';
+import {lazy, useEffect, useState, type ReactNode} from 'react';
 import {createBrowserRouter, Navigate} from 'react-router-dom';
 import {useSession} from '../auth/session';
 import {usePermissions} from '../permissions/permissions';
+import {usernameOnboardingApi} from '../../features/auth/onboarding';
 import {AppShell, OrganizationLayout} from '../../components/layout/AppShell';
 import {Loading} from '../../components/feedback';
 import Login from '../../pages/Login';
 import ResetPassword from '../../pages/ResetPassword';
+import ChooseUsername from '../../pages/ChooseUsername';
 import Placeholder from '../../pages/Placeholder';
 import type {PermissionKey} from '../../types/db';
 
@@ -52,15 +54,39 @@ function RequirePermission({perm, children}: {perm: PermissionKey; children: Rea
   return <>{children}</>;
 }
 
+// P1M (2026-07-16): post-approval username onboarding gate. An authenticated, APPROVED user with
+// public.users.username_chosen_at IS NULL is redirected to /onboarding/username before reaching the
+// main app. One-time-only (set_chosen_username raises on re-entry). MOCK_MODE skips the gate (demo
+// has no real approval flow). The check is best-effort — if the RPC errors (offline, edge), we do
+// NOT block the app: fail-open to the requested route (the server still enforces on actual writes).
+function RequireUsernameOnboarding({children}: {children: ReactNode}) {
+  const {status} = useSession();
+  const [gate, setGate] = useState<'loading' | 'needed' | 'ok'>('loading');
+  useEffect(() => {
+    let alive = true;
+    if (status !== 'authenticated') { if (alive) setGate('ok'); return; }
+    usernameOnboardingApi.needsOnboarding()
+      .then((need) => { if (alive) setGate(need ? 'needed' : 'ok'); })
+      .catch(() => { if (alive) setGate('ok'); }); // fail-open on RPC error
+    return () => { alive = false; };
+  }, [status]);
+  if (status === 'loading' || gate === 'loading') return <Loading label="Checking your account…" />;
+  if (gate === 'needed') return <Navigate to="/onboarding/username" replace />;
+  return <>{children}</>;
+}
+
 export const router = createBrowserRouter([
   {path: '/login', element: <Login />},
   {path: '/auth/reset', element: <ResetPassword />},
+  {path: '/onboarding/username', element: <RequireAuth><ChooseUsername /></RequireAuth>},
   // P1I: /accept removed — Invitations retired 2026-07-14 (accept_invitation auth-uid bug).
   {
     path: '/',
     element: (
       <RequireAuth>
-        <AppShell />
+        <RequireUsernameOnboarding>
+          <AppShell />
+        </RequireUsernameOnboarding>
       </RequireAuth>
     ),
     children: [
