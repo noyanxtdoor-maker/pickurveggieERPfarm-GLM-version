@@ -187,9 +187,13 @@ export default function SchedulesScreen() {
         }
       />
 
-      {/* M6C tier filter — visible to everyone; the Management option only exists for read_private holders */}
+      {/* M6C tier filter — visible to everyone; the Management option only exists for read_private holders.
+          PERM item 4 (owner 2026-07-16): for operator/below (no schedule.read_private), the "General
+          (everyone sees)" filter is REDUNDANT with "All events" — they only ever see General entries
+          from the server, so the split button is noise. Collapse to a single "All events" chip. Admin+
+          keeps the full 3-option All/General/Management split. */}
       <div className="flex flex-wrap items-center gap-1.5">
-        {(['all', 'General', ...(canReadPrivate ? ['Management' as const] : [])] as const).map((t) => (
+        {(['all', ...(canReadPrivate ? (['General', 'Management'] as const) : [])] as const).map((t) => (
           <button key={t} onClick={() => setTierFilter(t as typeof tierFilter)}
             className={cn('rounded-xl border px-3 py-1.5 text-xs font-bold transition', tierFilter === t ? 'border-transparent bg-farm-green text-white' : 'border-farm-accent bg-farm-card text-farm-muted hover:text-farm-green')}>
             {t === 'all' ? 'All events' : t === 'General' ? 'General (everyone sees)' : 'Management only'}

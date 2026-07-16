@@ -49,7 +49,7 @@ const CORE_MODULES = [
   {to: '/payroll', label: 'Salaries & Payroll', icon: Users2, perms: undefined},
   {to: '/operations', label: 'Operations', icon: ClipboardList, perms: undefined},
   {to: '/copilot', label: 'VeggieGenius', icon: Sparkles, perms: undefined}, // CAP-VG1: advisory copilot (read-only, C7 §11)
-  {to: '/reports', label: 'Reports', icon: BarChart3, perms: undefined},
+  {to: '/reports', label: 'Reports', icon: BarChart3, perms: ['accounting.read']}, // PERM item 5 (owner 2026-07-16): reports are admin+ (accounting.read ranks 30+); hide from operator/below.
   {to: '/settings', label: 'Settings Hub', icon: Settings, perms: undefined},
   {to: '/profile', label: 'My Profile', icon: UserCircle, perms: undefined}, // self-service username/email/password (owner 2026-07-15)
 ] as const satisfies ReadonlyArray<{to: string; label: string; icon: typeof Activity; perms: readonly PermissionKey[] | undefined}>;

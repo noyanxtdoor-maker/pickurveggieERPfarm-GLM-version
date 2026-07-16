@@ -241,9 +241,14 @@ export default function PosScreen() {
         title="Weigh POS Terminal"
         subtitle="High contrast, glove-friendly weighing terminal for daily crop sales"
         action={
-          <div className="w-56">
-            <SelectField value={branchId} onChange={(v) => {setBranchId(v); setBasket([]);}} placeholder="Branch" options={(branches ?? []).map((b) => ({value: b.id, label: b.name}))} />
-          </div>
+          // PERM item 3 (owner 2026-07-16): branch picker is admin+ only (membership.read). Operator/below
+          // only belong to ONE branch (RLS already limits offlineDB.branches to their membership), and the
+          // default-branchId effect above pins them to branches[0].id; the picker is redundant noise.
+          has('membership.read') ? (
+            <div className="w-56">
+              <SelectField value={branchId} onChange={(v) => {setBranchId(v); setBasket([]);}} placeholder="Branch" options={(branches ?? []).map((b) => ({value: b.id, label: b.name}))} />
+            </div>
+          ) : null
         }
       />
 
@@ -608,23 +613,25 @@ export default function PosScreen() {
             <h3 className="text-lg font-bold text-farm-green">Historical Sales Journal</h3>
             <p className="text-xs text-farm-muted">Failsafe registry tracking retail weigh-outs and pending wholesale pre-orders.</p>
           </div>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              const rows = invoices ?? [];
-              if (rows.length === 0) return notify('No listings to export.', 'error');
-              const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
-              const csv = ['Date,Slip,Type,PostedBy,Total,RetailTotal,Saved,Status,Note',
-                ...rows.map((t) => [t.created_at, `#${t.invoice_number ?? ''}`, t.sale_type ?? 'retail', t.posted_by ?? '', t.total, t.retail_total ?? t.total, t.saved ?? 0, t.status, esc(t.note ?? '')].join(','))].join('\n');
-              const url = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
-              const a = document.createElement('a');
-              a.href = url; a.download = 'pickurveggie_sales_journal.csv';
-              a.click();
-              URL.revokeObjectURL(url);
-            }}
-          >
-            <Download size={18} aria-hidden /> Export Journal (CSV)
-          </Button>
+          {has('accounting.read') && (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                const rows = invoices ?? [];
+                if (rows.length === 0) return notify('No listings to export.', 'error');
+                const esc = (v: string) => `"${v.replace(/"/g, '""')}"`;
+                const csv = ['Date,Slip,Type,PostedBy,Total,RetailTotal,Saved,Status,Note',
+                  ...rows.map((t) => [t.created_at, `#${t.invoice_number ?? ''}`, t.sale_type ?? 'retail', t.posted_by ?? '', t.total, t.retail_total ?? t.total, t.saved ?? 0, t.status, esc(t.note ?? '')].join(','))].join('\n');
+                const url = URL.createObjectURL(new Blob([csv], {type: 'text/csv;charset=utf-8'}));
+                const a = document.createElement('a');
+                a.href = url; a.download = 'pickurveggie_sales_journal.csv';
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download size={18} aria-hidden /> Export Journal (CSV)
+            </Button>
+          )}
         </div>
         <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-farm-accent-soft bg-farm-bg/50 p-4 md:grid-cols-5">
           <div>

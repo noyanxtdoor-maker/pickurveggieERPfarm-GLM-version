@@ -2,10 +2,14 @@
 // Reused by React Hook Form (client) and as the typed write contract to the api layer.
 import {z} from 'zod';
 
+// Role keys are stored UPPERCASE in the DB (role_key column has a CITEXT-ish check), but the
+// validation regex was rejecting lowercase input — the error message promised "A–Z, 0–9, dash"
+// while the pattern was uppercase-only. Fixed 2026-07-16 (owner report): allow lowercase letters in
+// the input; the role-create RPC normalizes to uppercase before insert (see roles_insert guard).
 const codeSlug = z
   .string()
   .trim()
-  .regex(/^[A-Z0-9][A-Z0-9-]{1,30}$/, 'Use 2–31 chars: A–Z, 0–9, dash; start alphanumeric.');
+  .regex(/^[A-Za-z0-9][A-Za-z0-9-]{1,30}$/, 'Use 2–31 chars: A–Z, 0–9, dash; start alphanumeric.');
 
 const name120 = z.string().trim().min(1, 'Required').max(120, 'Max 120 characters');
 

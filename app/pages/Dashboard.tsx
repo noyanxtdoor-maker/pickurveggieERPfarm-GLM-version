@@ -40,6 +40,14 @@ export default function Dashboard() {
   const [reportError, setReportError] = useState<string | null>(null);
   const [period, setPeriod] = useState<PeriodDays>(7);
 
+  // PERM item 1 (owner 2026-07-16 batch): the Organization widgets (Company/Branches/Members/Pending
+  // approvals stat cards) and the Quick actions tile row are admin-and-above only — operator and below
+  // only ever run the POS / their assigned workflows; showing them company-wide stats or branch-create
+  // / review-approvals tiles is noise. The cleanest admin+ proxy is `membership.read`: per the P1C 5-tier
+  // role seed (admin rank 30+), employee (rank 10) and operator (rank 20) do NOT receive that key, while
+  // admin / co_owner / owner all do. RLS already blocks the underlying reads; this hides the UI noise.
+  const isAdminPlus = has('membership.read');
+
   const company = useLiveQuery(async () => (companyId ? offlineDB.companies.get(companyId) : undefined), [companyId]);
   const branchCount = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).count() : 0), [companyId], 0);
 
@@ -260,25 +268,29 @@ export default function Dashboard() {
         </>
       )}
 
-      {/* Organization widgets (M1C §8.2) */}
-      <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard label="Company" value={company ? <StatusBadge status={company.status} /> : '—'} hint={company?.company_code} />
-        <StatCard label="Branches" value={branchCount ?? 0} hint={company?.base_currency_code} />
-        <StatCard label="Members" value={has('membership.read') ? (members ?? '—') : '—'} hint={has('membership.read') ? undefined : 'No access'} />
-        <StatCard label="Pending approvals" value={has('membership.read') ? (pendingApprovals ?? '—') : '—'} hint={has('membership.read') ? (pendingApprovals ? 'awaiting review' : undefined) : 'No access'} />
-      </div>
-
-      <Card>
-        <h2 className="mb-3 text-xl font-bold text-farm-green">Quick actions</h2>
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <ActionTile label="Weigh a Sale" icon={<ShoppingCart size={28} aria-hidden />} disabled={!has('pos.sell')} onClick={() => navigate('/pos')} />
-          <ActionTile label="Open Company" icon={<Building2 size={28} aria-hidden />} onClick={() => navigate('/organization/company')} />
-          <ActionTile label="Create Branch" icon={<Plus size={28} aria-hidden />} disabled={!has('branch.manage')} onClick={() => navigate('/organization/branches')} />
-          {/* P1I (2026-07-14): "Invite User" tile repurposed to "Review approvals" — Invitations retired;
-              the live onboarding path is self-signup → Approvals queue (membership.read-gated). */}
-          <ActionTile label="Review approvals" icon={<Clock3 size={28} aria-hidden />} disabled={!has('membership.read')} onClick={() => navigate('/organization/approvals')} />
+      {/* Organization widgets (M1C §8.2) — admin+ only (PERM item 1, owner 2026-07-16). */}
+      {isAdminPlus && (
+        <div className="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard label="Company" value={company ? <StatusBadge status={company.status} /> : '—'} hint={company?.company_code} />
+          <StatCard label="Branches" value={branchCount ?? 0} hint={company?.base_currency_code} />
+          <StatCard label="Members" value={has('membership.read') ? (members ?? '—') : '—'} hint={has('membership.read') ? undefined : 'No access'} />
+          <StatCard label="Pending approvals" value={has('membership.read') ? (pendingApprovals ?? '—') : '—'} hint={has('membership.read') ? (pendingApprovals ? 'awaiting review' : undefined) : 'No access'} />
         </div>
-      </Card>
+      )}
+
+      {isAdminPlus && (
+        <Card>
+          <h2 className="mb-3 text-xl font-bold text-farm-green">Quick actions</h2>
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <ActionTile label="Weigh a Sale" icon={<ShoppingCart size={28} aria-hidden />} disabled={!has('pos.sell')} onClick={() => navigate('/pos')} />
+            <ActionTile label="Open Company" icon={<Building2 size={28} aria-hidden />} onClick={() => navigate('/organization/company')} />
+            <ActionTile label="Create Branch" icon={<Plus size={28} aria-hidden />} disabled={!has('branch.manage')} onClick={() => navigate('/organization/branches')} />
+            {/* P1I (2026-07-14): "Invite User" tile repurposed to "Review approvals" — Invitations retired;
+                the live onboarding path is self-signup → Approvals queue (membership.read-gated). */}
+            <ActionTile label="Review approvals" icon={<Clock3 size={28} aria-hidden />} disabled={!has('membership.read')} onClick={() => navigate('/organization/approvals')} />
+          </div>
+        </Card>
+      )}
 
       {!has('membership.read') ? (
         <p className="mt-6 flex items-center gap-2 text-base text-farm-muted"><Mailbox size={18} aria-hidden /> Some widgets are hidden because your role doesn't grant access.</p>
