@@ -225,14 +225,13 @@ export default function InventoryScreen() {
       />
 
       <div className="flex flex-wrap gap-2.5">
-        {/* Two doors, one engine (owner 2026-07-04): "Buy Stock" = things that become inventory (seeds,
-            substrate, packaging, equipment); "Log Expense" = services you consume (water/electricity,
-            transport, misc) — the server books each to the right account automatically. */}
+        {/* One door, one engine (owner 2026-07-16, item 9): "Log Expense" button removed entirely.
+            Utilities (water/electricity/transport/misc) are now recorded via "Buy Stock" → Category
+            selector — pick Utilities (or Transport/Misc) and the server books it straight to Operating
+            Expenses with no stock added, exactly as the retired Log Expense shortcut did. Seeds,
+            substrate, packaging, equipment continue to add to inventory as before. */}
         {canPurchase ? (
           <Button onClick={() => openBuy()}><Plus size={18} aria-hidden /> Buy Stock</Button>
-        ) : null}
-        {canPurchase ? (
-          <Button variant="secondary" onClick={() => openBuy('utilities')}><FileText size={18} aria-hidden /> Log Expense</Button>
         ) : null}
         {canAdjust ? (
           <Button variant="secondary" onClick={() => {setUseItemId((items ?? [])[0]?.id ?? ''); setUseQty(''); setUsePurpose(''); setUseOpen(true);}}>
@@ -281,7 +280,7 @@ export default function InventoryScreen() {
               <span className="text-sm text-farm-muted">Across <strong className="font-bold text-farm-ink">{summary.count}</strong> purchase{summary.count === 1 ? '' : 's'}</span>
             </div>
             {summary.count === 0 ? (
-              <EmptyState title="No purchases in this period" hint="Log purchases with “Buy Stock” or “Log Expense” — they appear here automatically." />
+              <EmptyState title="No purchases in this period" hint="Log purchases with “Buy Stock” (seeds, stock, equipment, utilities) — they appear here automatically." />
             ) : (
               <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                 <SummaryTable title="By category" rows={summary.byCategory} />
