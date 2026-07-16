@@ -37,6 +37,12 @@ export interface SaleOptions {
   discountRate?: 0 | 0.1; // server-constrained to {0, 0.10}
   deliveryFee?: number;
   note?: string;
+  // P2-M9A customer attribution (owner 2026-07-16 batch): optional customer the sale is attributed to.
+  // Stored on the local PosInvoice.customer_id today; server-side persistence via a new
+  // p_customer_id parameter on pos_record_sale is queued for the next additive migration (Tier-3).
+  // Until that migration, the customer_id lives only in the device cache / outbox payload header —
+  // the money/GSIS legs are unaffected (the server's discount + sale_kind paths are the money path).
+  customerId?: string | null;
 }
 
 export interface SaleResult {
@@ -96,6 +102,7 @@ export const posApi = {
       tender_cash: kind === 'paid' ? tenderCash : 0,
       change_amount: kind === 'paid' ? round2(tenderCash - total) : 0,
       note: opts.note ?? null,
+      customer_id: opts.customerId ?? null,
       status: 'PendingSync', created_at: new Date().toISOString(),
     };
 
@@ -136,6 +143,11 @@ export const posApi = {
         : {product_id: l.product_id, finished_goods_batch_id: l.finished_goods_batch_id, weight_kg: l.weight_kg}),
       p_tender_cash: tenderCash, p_idempotency_key: idem,
       p_sale_kind: kind, p_discount_rate: discountRate, p_delivery_fee: deliveryFee, p_customer_note: opts.note ?? null,
+      // NOTE (queued for Tier-3, owner 2026-07-16): p_customer_id is intentionally NOT in the RPC payload yet —
+      // pos_record_sale will REJECT unknown parameters. The customer_id is captured in the local PosInvoice
+      // (base.customer_id) so mock-mode + the Dexie cache persist it; the server-side persistence waits on an
+      // additive migration that adds p_customer_id to pos_record_sale + writes invoices.customer_id. The replay
+      // path (when the new migration lands) will catch up customer_id from base on the next sync.
     };
 
     if (online()) {

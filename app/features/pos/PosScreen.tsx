@@ -17,7 +17,8 @@ import {Numpad} from './Numpad';
 import {posApi, type SaleLineInput, type SaleResult} from './api';
 import {RECEIPT_SIZES, useReceiptSize} from './useReceiptSize';
 import {farmPerKg, formatPeso, lineTotal, round2} from './money';
-import type {FinishedGood, PosInvoice, Product} from '../../types/db';
+import {customersApi} from '../customers/api';
+import type {Customer, FinishedGood, PosInvoice, Product} from '../../types/db';
 
 type RightPane = 'slip' | 'checkout' | 'receipt' | 'settle';
 type SaleKind = 'paid' | 'preorder';
@@ -68,6 +69,16 @@ export default function PosScreen() {
   const [preDelivery, setPreDelivery] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState('');
   const [note, setNote] = useState('');
+
+  // POS customer picker (owner 2026-07-16 batch): attribute the sale to a Customer from the Customers
+  // & Credit list. Optional — a walk-in retail sale leaves this empty. The customer_id lands on the
+  // local PosInvoice.customer_id (P2-M9A field at db.ts L207). Server-side persistence queued Tier-3.
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customerId, setCustomerId] = useState<string>('');
+  useEffect(() => {
+    if (!companyId) return;
+    customersApi.fetchCustomers(companyId).then((rows) => setCustomers(rows.filter((c) => c.status === 'Active'))).catch(() => setCustomers([]));
+  }, [companyId, refreshTick]);
 
   // settle / void targets
   const [settleTarget, setSettleTarget] = useState<PosInvoice | null>(null);
@@ -165,9 +176,10 @@ export default function PosScreen() {
         discountRate: saleKind === 'preorder' && preDiscount ? 0.1 : 0,
         deliveryFee: feeNum,
         note: note.trim() || undefined,
+        customerId: customerId || null,
       });
       setLastSale(result);
-      setBasket([]); setCash(''); setNote(''); setDeliveryFee(''); setPreDelivery(false); setPreDiscount(true); setSaleKind('paid');
+      setBasket([]); setCash(''); setNote(''); setDeliveryFee(''); setPreDelivery(false); setPreDiscount(true); setSaleKind('paid'); setCustomerId('');
       setPane('receipt');
       if (result.provisional) triggerSync();
       reload();
@@ -402,6 +414,26 @@ export default function PosScreen() {
                 <span className="tabular text-3xl font-black text-farm-green">{formatPeso(grandTotal)}</span>
               </div>
 
+              {/* POS customer picker (owner 2026-07-16 batch): attribute this sale to a Customer from
+                  Customers & Credit. Optional — walk-in retail leaves it on "Walk-in (no customer)".
+                  The selected customer_id lands on the local PosInvoice.customer_id (P2-M9A field);
+                  server-side persistence on invoices.customer_id is queued for the Tier-3 migration that
+                  adds p_customer_id to pos_record_sale. */}
+              <div className="mb-3">
+                <label className="mb-1.5 block text-xs font-bold uppercase text-farm-muted" htmlFor="pos-customer">Customer</label>
+                {customers.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-farm-accent-soft bg-farm-bg/50 px-3 py-2 text-[11px] italic text-farm-muted">
+                    No active customers in this company yet — the sale will be a walk-in. Add customers in Customers & Credit.
+                  </p>
+                ) : (
+                  <SelectField
+                    value={customerId}
+                    onChange={setCustomerId}
+                    options={[{value: '', label: 'Walk-in (no customer)'}, ...customers.map((c) => ({value: c.id, label: c.name + (c.contact ? ` — ${c.contact}` : '')}))]}
+                  />
+                )}
+              </div>
+
               {saleKind === 'paid' ? (
                 <>
                   <label className="mb-1.5 block text-xs font-bold uppercase text-farm-muted" htmlFor="pos-cash">Cash received (₱)</label>
@@ -493,6 +525,10 @@ export default function PosScreen() {
                   {lastSale?.provisional ? ' · saved offline' : ''}
                 </p>
                 {lastSale?.invoice.posted_by ? <p className="text-[10px] text-farm-muted">Cashier: <span className="font-semibold text-farm-ink">{lastSale.invoice.posted_by}</span></p> : null}
+                {/* Customer attribution on the printed slip (owner 2026-07-16 batch): show the customer's
+                    name when this sale was attributed to one. For walk-in sales (customer_id null), the
+                    "Cash sale — walk-in" hint is printed instead. */}
+                {lastSale?.invoice.customer_id ? (() => { const c = customers.find((x) => x.id === lastSale.invoice.customer_id); return c ? <p className="text-[10px] text-farm-muted">Customer: <span className="font-semibold text-farm-ink">{c.name}</span>{c.contact ? <span className="text-farm-muted"> · {c.contact}</span> : null}</p> : null; })() : <p className="text-[10px] text-farm-muted">Cash sale — walk-in</p>}
                 <p className="mb-2 text-[10px] font-bold text-farm-green">
                   Permit Type: <span className="bg-farm-accent-soft px-1 text-[9px] uppercase tracking-wider">{lastSale?.invoice.status === 'Unpaid' ? 'Pre-Order delivery' : 'Retail PAID Receipt'}</span>
                 </p>
