@@ -2,7 +2,7 @@
 // visual authority). White sidebar with PV logo + section labels + profile block; header with BRANCH LIVE chip,
 // session pill; farm-bg main stage. Tablet-first, ≥56px targets preserved.
 // BUG #7 (handoff 002 §7): the red top-bar Sign Out was removed 2026-07-12 — logout is now Settings → Session only.
-import {Suspense, useEffect, useState} from 'react';
+import {Suspense, useCallback, useEffect, useRef, useState} from 'react';
 import {NavLink, Outlet} from 'react-router-dom';
 import {useLiveQuery} from 'dexie-react-hooks';
 import {
@@ -238,6 +238,25 @@ function TopBar() {
   const [isDark, toggleDark] = useDarkToggle();
   const company = useLiveQuery(async () => (companyId ? offlineDB.companies.get(companyId) : undefined), [companyId]);
 
+  // Local UI-only sync flag (owner directive 2026-07-16): the user reported the Sync button
+  // "doesn't animate, glitches on tap." Root cause: useSync()'s `syncing` flag toggles with the
+  // raw outbox-drain timing (which can finish in <50ms), and the manualSync 700ms guard races
+  // against triggerSync()'s own setSyncing(false) in .finally() — so the icon briefly flips state
+  // mid-spin (the "glitch"). The clean fix decouples the VISUAL spin from the outbox flag: a local
+  // `uiSyncing` state, always ≥700ms, drives the icon + the full-screen overlay. The whole-screen
+  // shimmer overlay gives "perfect animation for sync — the whole screen" feedback.
+  const [uiSyncing, setUiSyncing] = useState(false);
+  const syncTimeout = useRef<number | null>(null);
+  const handleSyncClick = useCallback(() => {
+    if (uiSyncing) return; // ignore taps during spin (prevents restart-glitch)
+    setUiSyncing(true);
+    manualSync();
+    if (syncTimeout.current) window.clearTimeout(syncTimeout.current);
+    syncTimeout.current = window.setTimeout(() => setUiSyncing(false), 700);
+  }, [uiSyncing, manualSync]);
+  useEffect(() => () => { if (syncTimeout.current) window.clearTimeout(syncTimeout.current); }, []);
+  const showSync = uiSyncing || syncing;
+
   return (
     <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-farm-accent-soft bg-farm-card px-4 py-3 md:px-6">
       <div>
@@ -259,12 +278,14 @@ function TopBar() {
           {isDark ? <Sun size={18} aria-hidden /> : <Moon size={18} aria-hidden />}
         </button>
         <button
-          onClick={manualSync}
-          className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold transition', online ? 'text-farm-green hover:bg-farm-accent-soft' : 'text-farm-warn')}
-          title={syncing ? 'Syncing…' : online ? 'Online — tap to sync + refresh' : 'Offline'}
+          onClick={handleSyncClick}
+          disabled={uiSyncing}
+          className={cn('inline-flex min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold transition', online ? 'text-farm-green hover:bg-farm-accent-soft' : 'text-farm-warn', uiSyncing && 'cursor-progress opacity-80')}
+          title={showSync ? 'Syncing…' : online ? 'Online — tap to sync + refresh' : 'Offline'}
+          aria-busy={showSync || undefined}
         >
-          {online ? <RefreshCw size={18} className={syncing ? 'animate-spin' : ''} aria-hidden /> : <CloudOff size={18} aria-hidden />}
-          {syncing ? <span className="text-xs">Syncing…</span> : null}
+          {online ? <RefreshCw size={18} className={showSync ? 'animate-spin' : ''} aria-hidden /> : <CloudOff size={18} aria-hidden />}
+          {showSync ? <span className="text-xs">Syncing…</span> : null}
           {pending > 0 ? <span className="rounded-full bg-amber-200 px-2 text-amber-900">{pending}</span> : null}
         </button>
         <div className="hidden min-h-12 items-center gap-2 rounded-xl border border-farm-accent-soft bg-farm-bg px-3 font-semibold text-farm-ink md:inline-flex">
@@ -275,6 +296,21 @@ function TopBar() {
             Settings → Session panel only (useSession().signOut still wired from SettingsScreen).
             The `signOut` destructure above is retained for the (future) mobile-drawer path. */}
       </div>
+      {/* Full-screen sync overlay (owner directive 2026-07-16): "we want a perfect animation for sync
+          the whole screen" — a subtle top-edge shimmer + faint backdrop sweep that paints whenever the
+          Sync button's uiSyncing flag is true (min 700ms). It's pointer-events-none so users can still
+          tap while it animates; the visual signals "sync running" without blocking interactive use. */}
+      {uiSyncing ? (
+        <div
+          aria-live="polite"
+          aria-busy="true"
+          className="syncoverlay pointer-events-none fixed inset-0 z-40 overflow-hidden"
+          role="status"
+        >
+          <span className="syncoverlay__shimmer" />
+          <span className="syncoverlay__label">Syncing…</span>
+        </div>
+      ) : null}
     </header>
   );
 }
@@ -322,6 +358,14 @@ export function AwaitingApproval() {
 export function AppShell() {
   const {online, pending} = useSync();
   const {companyId, loading} = usePermissions();
+  // Real-mode gate (owner directive 2026-07-16): no company membership = AwaitingApproval, AND
+  // we must NOT flash the dashboard for ~0.5s before that decision resolves. Today `loading`
+  // flips false a moment after a cached snapshot is read from Dexie, and <Outlet/> can paint
+  // the last route snapshot before the server confirms the user is still blind — that is the
+  // "peek" we are killing. So: while loading = true, render <Loading/> (the gate is undecided);
+  // once loading=false, render <AwaitingApproval/> (no companyId) OR the dashboard. The dashboard
+  // <Outlet/> never mounts until companyId is non-null — zero peek.
+  if (!MOCK_MODE && loading) return <Loading />;
   if (!MOCK_MODE && !loading && !companyId) return <AwaitingApproval />;
   return (
     <div className="flex h-screen bg-farm-bg text-farm-ink">

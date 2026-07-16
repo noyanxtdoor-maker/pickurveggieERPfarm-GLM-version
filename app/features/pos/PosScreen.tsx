@@ -15,6 +15,7 @@ import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
 import {Numpad} from './Numpad';
 import {posApi, type SaleLineInput, type SaleResult} from './api';
+import {RECEIPT_SIZES, useReceiptSize} from './useReceiptSize';
 import {farmPerKg, formatPeso, lineTotal, round2} from './money';
 import type {FinishedGood, PosInvoice, Product} from '../../types/db';
 
@@ -72,6 +73,21 @@ export default function PosScreen() {
   const [settleTarget, setSettleTarget] = useState<PosInvoice | null>(null);
   const [voidTarget, setVoidTarget] = useState<PosInvoice | null>(null);
   const [voidReason, setVoidReason] = useState('');
+
+  // Receipt paper size (owner 2026-07-16): persisted in localStorage, mirrored to <html data-receipt-size>
+  // so app/index.css `@media print` can set the actual paper-feed width (58mm or 80mm). Default 80mm.
+  const {size: receiptSize, setSize: setReceiptSize} = useReceiptSize();
+
+  // Print any historical invoice (owner 2026-07-16): load the journal row as a SaleResult-shaped
+  // lastSale → flip the right pane to 'receipt' (the printable slip view) → call window.print().
+  // The slip is `id="pos-slip"` so app/index.css hides everything else on print. provisional=false
+  // for historical rows (they've already synced or were always offline — the slip renders either way).
+  const printInvoice = useCallback((inv: PosInvoice) => {
+    setLastSale({invoice: inv, provisional: inv.invoice_number == null});
+    setPane('receipt');
+    // Defer one frame so #pos-slip paints before the print dialog reads the DOM.
+    setTimeout(() => window.print(), 50);
+  }, []);
 
   // journal filters (prototype: date + sale type + payment status)
   const [journalDate, setJournalDate] = useState('');
@@ -515,6 +531,7 @@ export default function PosScreen() {
                 <Button variant="secondary" onClick={() => window.print()}><Printer size={18} aria-hidden /> Print Slip</Button>
                 <Button className="flex-1" onClick={() => setPane('slip')}>New Sale</Button>
               </div>
+              <p className="mt-2 text-center text-[10px] text-farm-muted">Paper size: <strong className="font-mono">{receiptSize}</strong> — change it in the Sales Journal filter row.</p>
             </Card>
           )}
         </div>
@@ -558,7 +575,7 @@ export default function PosScreen() {
             <Download size={18} aria-hidden /> Export Journal (CSV)
           </Button>
         </div>
-        <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-farm-accent-soft bg-farm-bg/50 p-4 md:grid-cols-4">
+        <div className="mb-4 grid grid-cols-1 gap-3 rounded-xl border border-farm-accent-soft bg-farm-bg/50 p-4 md:grid-cols-5">
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="j-date">Filter Date</label>
             <input id="j-date" type="date" value={journalDate} onChange={(e) => setJournalDate(e.target.value)} className="min-h-12 w-full rounded-lg border border-farm-accent-soft bg-farm-card p-2 text-sm font-semibold" />
@@ -570,6 +587,11 @@ export default function PosScreen() {
           <div>
             <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Payment Status</label>
             <SelectField value={journalStatus} onChange={setJournalStatus} options={[{value: 'all', label: 'All Statuses'}, {value: 'Paid', label: 'Paid (Cleared)'}, {value: 'Unpaid', label: 'Pre-orders (Unpaid)'}, {value: 'Voided', label: 'Voided'}, {value: 'PendingSync', label: 'Pending Sync'}]} />
+          </div>
+          {/* Receipt paper size (owner 2026-07-16) — a single dropdown persisted across sessions. */}
+          <div>
+            <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Receipt Paper Size</label>
+            <SelectField value={receiptSize} onChange={(v) => setReceiptSize(v as '58mm' | '80mm')} options={RECEIPT_SIZES.map((s) => ({value: s.value, label: s.label}))} />
           </div>
           <div className="flex items-end">
             <Button variant="secondary" className="w-full" onClick={() => {setJournalDate(''); setJournalType('all'); setJournalStatus('all');}}>Reset Filters</Button>
@@ -620,6 +642,8 @@ export default function PosScreen() {
                         {t.status === 'Unpaid' && canSettle ? (
                           <button onClick={() => {setSettleTarget(t); setCash(''); setPane('settle');}} className="rounded border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100">Mark Paid</button>
                         ) : null}
+                        {/* Print (owner 2026-07-16): re-print any historical receipt at the configured paper size. */}
+                        <button onClick={() => printInvoice(t)} className="inline-flex items-center gap-1 rounded border border-farm-accent-soft bg-farm-bg px-2 py-1 text-xs font-semibold text-farm-green hover:bg-farm-accent-soft" title={`Print slip #${t.invoice_number ?? '—'} (${receiptSize})`}><Printer size={13} aria-hidden /> Print</button>
                         {t.status !== 'Voided' && t.status !== 'PendingSync' && canVoid ? (
                           <button onClick={() => {setVoidTarget(t); setVoidReason('');}} className="rounded px-2 py-1 text-xs font-semibold text-farm-danger hover:bg-red-50">Void</button>
                         ) : null}
