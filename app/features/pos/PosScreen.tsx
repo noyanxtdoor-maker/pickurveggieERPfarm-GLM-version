@@ -163,8 +163,13 @@ export default function PosScreen() {
   const retailTotal = round2(basket.reduce((s, l) => s + (l.weight_kg !== null && l.retail_per_kg != null ? lineTotal(l.weight_kg, l.retail_per_kg) : lineAmount(l)), 0));
   const savedAmt = round2(retailTotal - subtotal); // prototype "Farm Discount Saved"
   const feeNum = preDelivery ? (parseFloat(deliveryFee) || 0) : 0;
-  const discountNum = saleKind === 'preorder' && preDiscount ? round2(subtotal * 0.1) : 0;
-  const grandTotal = saleKind === 'preorder' ? round2(subtotal - discountNum + feeNum) : subtotal;
+  // Tier 2.4 (owner 2026-07-16): 10% Farm Discount is now available on BOTH checkout tabs —
+  // Direct Cash Clearance (paid) AND Pre-order (credit). The server-side p2m2f migration
+  // (20260716100000) lets pos_record_sale accept p_discount_rate=0.10 when p_sale_kind='paid'.
+  // Delivery fee remains pre-order-only (server still rejects fee on paid). The toggle UI for
+  // the discount was originally only on the preorder pane; it now appears on BOTH panes (see below).
+  const discountNum = preDiscount ? round2(subtotal * 0.1) : 0;
+  const grandTotal = saleKind === 'preorder' ? round2(subtotal - discountNum + feeNum) : round2(subtotal - discountNum);
   const cashNum = parseFloat(cash) || 0;
 
   async function commitSale() {
@@ -173,7 +178,7 @@ export default function PosScreen() {
     try {
       const result = await posApi.recordSale(companyId, branchId, basket, saleKind === 'paid' ? cashNum : 0, {
         kind: saleKind,
-        discountRate: saleKind === 'preorder' && preDiscount ? 0.1 : 0,
+        discountRate: preDiscount ? 0.1 : 0,
         deliveryFee: feeNum,
         note: note.trim() || undefined,
         customerId: customerId || null,
@@ -450,6 +455,16 @@ export default function PosScreen() {
                     <span className={cn('tabular text-sm font-extrabold', cashNum >= grandTotal ? 'text-farm-green' : 'text-farm-danger')}>{formatPeso(Math.max(0, round2(cashNum - grandTotal)))}</span>
                   </div>
                   <Numpad value={cash} onChange={setCash} />
+                  {/* Paid discount toggle (Tier 2.4, owner 2026-07-16): 10% Farm Discount is available
+                      on the paid (walk-in cash) tab too — the server-side p2m2f migration allows it.
+                      Delivery fee is NOT offered here (server still rejects fee on paid). Mirroring the
+                      preorder pane's toggle style for visual parity. */}
+                  <div className="mt-3 rounded-xl border border-farm-accent-soft bg-farm-accent-soft/40 p-3 text-sm">
+                    <label className="flex min-h-10 cursor-pointer items-center justify-between font-bold text-farm-ink">
+                      <span className="flex items-center gap-2"><input type="checkbox" checked={preDiscount} onChange={(e) => setPreDiscount(e.target.checked)} className="h-4 w-4 accent-farm-green" /> Include 10% Discount</span>
+                      {preDiscount ? <span className="tabular text-farm-green">− {formatPeso(discountNum)}</span> : null}
+                    </label>
+                  </div>
                 </>
               ) : (
                 <div className="space-y-3">
