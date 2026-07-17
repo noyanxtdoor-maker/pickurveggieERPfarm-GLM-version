@@ -24,6 +24,7 @@ import {authApi, type PendingUser} from '../../auth/api';
 import {payrollApi} from '../../payroll/api';
 import {OverridesDialog} from '../overrides/overrides';
 import {revokeRequestsApi, type RevokeRequest} from '../revoke-requests/revokeRequests';
+import {priceChangeRequestsApi, type PriceChangeRequest} from '../../inventory/priceChangeRequests';
 import {MOCK_MODE, DEMO} from '../../../core/mock/mock';
 
 // P1D §Part1: rank<40 (below co_owner) = a role that implies paid work — approving/assigning it requires
@@ -57,6 +58,7 @@ export default function ApprovalsScreen() {
   const {notify} = useToast();
   const {triggerSync, refreshTick} = useSync();
   const canManage = has('membership.manage');
+  const canManageProducts = has('product.manage');
   const canManageJobTitle = has('job_title.manage');
   const [jobTitleTarget, setJobTitleTarget] = useState<MemberRow | null>(null);
   const [jobTitleValue, setJobTitleValue] = useState('');
@@ -89,6 +91,9 @@ export default function ApprovalsScreen() {
   // Any co_owner/owner may REQUEST a revoke; a DIFFERENT co_owner/owner must APPROVE/REJECT it
   // (separation of duties). The box only renders when this queue is non-empty (owner spec).
   const [revokeReqs, setRevokeReqs] = useState<RevokeRequest[] | null>(null);
+  const [priceReqs, setPriceReqs] = useState<PriceChangeRequest[] | null>(null);
+  const [priceRejectTarget, setPriceRejectTarget] = useState<PriceChangeRequest | null>(null);
+  const [priceRejectReason, setPriceRejectReason] = useState('');
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
 
   // P1D §Part1: the unified approve/reassign dialog — see AssignTarget above.
@@ -107,6 +112,7 @@ export default function ApprovalsScreen() {
     membershipsApi.fetch(companyId).then(setRows).catch(() => setRows([]));
     if (canManage) authApi.listPendingUsers().then(setPending).catch(() => setPending([]));
     if (canManage) revokeRequestsApi.list().then(setRevokeReqs).catch(() => setRevokeReqs([]));
+    if (canManageProducts) priceChangeRequestsApi.list().then(setPriceReqs).catch(() => setPriceReqs([]));
     if (canManage) payrollApi.fetchPositions(companyId).then(setPositions).catch(() => setPositions([]));
     if (canManage) membershipsApi.unlinkedPayrollEligible(companyId).then((rows) => setUnlinkedEligible(new Set(rows.map((r) => r.user_id)))).catch(() => setUnlinkedEligible(new Set()));
     // Real mode on a fresh device: the branch/role dropdowns read the Dexie cache, which is empty until the
@@ -284,6 +290,30 @@ export default function ApprovalsScreen() {
       setArchiveTarget(null);
       reload();
     } catch (e) { notify(e instanceof Error ? e.message : 'Could not archive', 'error'); } finally { setBusy(false); }
+  }
+
+  // P2N1 (PERM item 2): crop-pricing approval workflow. Employee/operator can FILE a request
+  // (request_price_change); admin+ (product.manage) APPROVE here applies the price to products.
+  async function approvePrice(req: PriceChangeRequest) {
+    setBusy(true);
+    try {
+      await priceChangeRequestsApi.approve(req.id);
+      await triggerSync();
+      notify(`${req.product_name} price updated to ₱${req.requested_retail_per_kg.toFixed(2)}/kg`);
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Approve price failed', 'error'); } finally { setBusy(false); }
+  }
+  async function commitRejectPrice() {
+    if (!priceRejectTarget) return;
+    setBusy(true);
+    try {
+      await priceChangeRequestsApi.reject(priceRejectTarget.id, priceRejectReason);
+      await triggerSync();
+      notify(`${priceRejectTarget.product_name} request rejected`);
+      setPriceRejectTarget(null);
+      setPriceRejectReason('');
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Reject price failed', 'error'); } finally { setBusy(false); }
   }
 
   return (
@@ -522,6 +552,40 @@ export default function ApprovalsScreen() {
         </Dialog.Portal>
       </Dialog.Root>
 
+      {/* P2N1 (2026-07-16): reject-with-reason dialog for crop price request reject. Required
+          because reject_price_change is RPC with a non-null reason arg. Mirrors the revoke dialog. */}
+      <Dialog.Root open={priceRejectTarget !== null} onOpenChange={(o) => {if (!o) {setPriceRejectTarget(null); setPriceRejectReason('');}}}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-farm-card p-6 shadow-xl">
+            <Dialog.Title className="mb-2 text-lg font-bold text-farm-danger">
+              {priceRejectTarget ? `Reject price change for ${priceRejectTarget.product_name}?` : ''}
+            </Dialog.Title>
+            <Dialog.Description className="mb-4 text-sm text-farm-muted">
+              The live price stays at ₱{priceRejectTarget?.current_retail_per_kg.toFixed(2) ?? '—'}/kg. The requester will see this reason in their audit log.
+            </Dialog.Description>
+            <textarea
+              value={priceRejectReason}
+              onChange={(e) => setPriceRejectReason(e.target.value)}
+              placeholder="Reason (required) — e.g. out of policy band, not seasonally aligned"
+              rows={3}
+              className="min-h-20 w-full resize-none rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-2 text-sm"
+              aria-label="Reason for price-change reject"
+            />
+            <div className="mt-5 flex gap-2 border-t border-farm-accent-soft pt-4">
+              <Button variant="secondary" onClick={() => {setPriceRejectTarget(null); setPriceRejectReason('');}} disabled={busy}>Cancel</Button>
+              <Button
+                className="flex-1"
+                disabled={busy || priceRejectReason.trim().length < 3}
+                onClick={() => void commitRejectPrice()}
+              >
+                {busy ? 'Saving…' : 'Confirm reject'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+
       {/* P1J (2026-07-16): the Pending Revoke Approvals box — mirrors Pending Account Approvals.
           Renders ONLY when revokeReqs has rows (owner spec: "only appear when there's a pending revoke"). */}
       {canManage && revokeReqs != null && revokeReqs.length > 0 ? (
@@ -545,6 +609,40 @@ export default function ApprovalsScreen() {
                   </button>
                   <button onClick={() => void rejectRevoke(r)} disabled={busy}
                     className="rounded-lg border border-farm-accent bg-farm-bg px-3 py-1.5 text-xs font-bold text-farm-green hover:bg-farm-accent-soft">
+                    Reject
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {/* P2N1 (2026-07-16): Pending Crop Price Changes — admin+ (product.manage) reviews employee
+          requests to change retail_per_kg. Approve applies the change to the live product row;
+          Reject requires a reason. Mirrors the Pending Account Approvals + Pending Revoke
+          Approvals boxes. */}
+      {canManageProducts && priceReqs != null && priceReqs.length > 0 ? (
+        <Card>
+          <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-farm-warn"><Clock3 className="h-5 w-5" aria-hidden /> Pending Crop Price Changes</h3>
+          <p className="mb-3 text-xs text-farm-muted">These requests were filed by members who don't have product.manage on their role. Approve to apply the new price to {`products.retail_per_kg`}; reject with a reason to send it back without touching the live price.</p>
+          <ul className="divide-y divide-farm-accent-soft">
+            {priceReqs.filter((r) => r.status === 'Pending').map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div>
+                  <p className="text-sm font-bold text-farm-ink">{r.product_name} <span className="font-normal text-farm-muted">({r.product_code})</span></p>
+                  <p className="text-xs text-farm-muted">
+                    ₱{r.current_retail_per_kg.toFixed(2)}/kg → <span className="font-bold text-farm-ink">₱{r.requested_retail_per_kg.toFixed(2)}/kg</span>
+                    {' '}· {r.requester_name ?? 'a member'} · {new Date(r.created_at).toLocaleDateString('en-PH', {month: 'short', day: 'numeric'})}
+                  </p>
+                </div>
+                <span className="flex gap-1.5">
+                  <button onClick={() => void approvePrice(r)} disabled={busy}
+                    className="rounded-lg bg-farm-green px-3 py-1.5 text-xs font-bold text-white hover:opacity-90">
+                    Approve
+                  </button>
+                  <button onClick={() => setPriceRejectTarget(r)} disabled={busy}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-farm-danger hover:bg-red-100">
                     Reject
                   </button>
                 </span>
