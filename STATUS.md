@@ -13,7 +13,7 @@
 to review based on what this file marks "Done." **Rule: never round up.** If a flow was not tested end-to-end by
 the agent, or a reviewer has an open issue against it, it is **In Progress** — not Done.
 
-_Last updated: 2026-07-08 · HEAD `a88a9ef` (GLM 5.2 audit-fold-2; underneath: `0ec78ab` boundary-fold → `eb8c650` boundary record → `fefcfed` audit-fixes) · branch `feature/phase-0-foundation` (in sync with `origin` = repo B, the canonical home per the 2026-07-08 boundary decision — see handoff §15). Sticky-header convention: this SHA is the LAST commit that modified this header line; `git log --oneline -5` is the source of truth for the actual tip — see handoff §15.
+_Last updated: 2026-07-17 · HEAD `4129882` (docs: DR restore-drill findings 2026-07-17; underneath: `6fd0154` T3.3 Usage Summary, `d251257` T3.2 vendor picker, `14c7298` T3.1 vendors + AP ledger, `1ea660e` P2N2 void approval, `404e5e0` P2N1 crop-pricing approval UI). Branch `feature/phase-0-foundation` (in sync with `origin` = repo B). Sticky-header convention: this SHA is the LAST commit that modified this header line; `git log --oneline -5` is the source of truth for the actual tip — see handoff §15._
 
 ---
 
@@ -73,6 +73,12 @@ the flow was not exercised.
 | **POS — cash-drawer strip removed** (owner: manual drawer at launch; `cash_sessions` DB kept, dormant) | Done (pushed) | 2026-07-04 | **browser-mock** (sale posts with no drawer). |
 | **Inventory** (M3A materials/receivings w/ source Lazada/Shopee/TikTok + pcs, FIFO batches, governed purchase/adjust, **Log Stock Usage**, equipment catalog + monthly condition checklist, low-stock alerts) | Done (pushed) | 2026-07-05 | **guard** inventory 24; **browser-mock** buy/log-usage. |
 | **Inventory — Purchase Summary report** (spend by category + source, period filter) | Done (pushed) | 2026-07-05 | **unit** purchase-summary.test; **browser-mock** (logged a purchase → grouped correctly). Fixed a real tab-isolation bug during this. |
+| **PERM item 6 — Void-sale approval workflow** (P2N2, 2026-07-16): `void_requests` table + 4 RPCs (request_void, list_void_requests, approve_void_request, reject_void_request) with RLS forced + separation of duties + one-Pending-per-invoice unique partial index. Operator/cashier files (gated on `pos.sell`); admin+ reviews in the Approvals screen; approval reverses the journal, returns stock, audits the chain. PosScreen "Void slip" button is now "Request void" (anyone with `pos.sell` can file). | Done (pushed + cloud-deployed) | 2026-07-16 | **guard** p2n2-void-approval-security 6/6 (HAPPY1 full reversal + journal balanced + stock returned; HAPPY2 reject; SAD1 role gate; SAD2 self-approve blocked; SAD3 one-Pending; SAD4 double-approve blocked). **Sibling-guards re-run green** (pos-security 18, accounting 19, p1j, p1m, inventory 24, t3-1 8). **Three-up**: lint 0 / vitest 24-113-0 / build 0. **Cloud-verified**: table + 4 RPCs live on `jabjyvdkadcbfocaerno`. **PendingVoid** status added to PosInvoice union + report tone map (not money-touching, just a label). |
+| **PERM item 2 part 2 — Crop-pricing approval UI** (P2N1, 2026-07-16): "Pending Crop Price Changes" card on the Approvals screen mirroring the existing revoke-approval pattern. Operators without `product.manage` can FILE a price change request via `price_change_requests`; admin+ reviews; approval applies the new `retail_per_kg` to the live product. | Done (pushed) | 2026-07-16 | **browser-mock** (file a request, see it in the Approvals card, approve applies). Server `price_change_requests` table + `request_price_change` / `approve_price_change` / `reject_price_change` / `list_price_change_requests` RPCs were committed in a prior batch (P1E on 2026-07-12); this commit is the UI wiring. **No new guard** — the underlying RPCs were already guarded by accounting-security. |
+| **Tier 3 item 1 — Vendors & AP** (T3.1, 2026-07-16): vendor master + cost schedule + vendor ledger (Accounts Payable). 6 new tables (vendors, cost_schedule, vendor_invoices, vendor_invoice_lines, vendor_payments, vendor_payment_allocations), 2 new permissions (vendor.read, vendor.manage), 8 new RPCs (vendor_upsert, cost_schedule_upsert, cost_schedule_lookup, vendor_invoice_record, vendor_payment_record, vendor_ap_standing, vendor_ensure_accounts). Idempotent re-record on (company, vendor, invoice_number) — offline-replay safe. Cost-schedule auto-closes the prior active row when a new rate is added (snapshot semantics: the receiving is a historical record; later vendor renames do NOT propagate). New `/vendors` route + "Vendors & AP" nav entry (Truck icon) + VendorsScreen (data table + 3 dialogs: Edit, Record Invoice, Record Payment). Vendor AP standing is a derived view, never stored. | Done (pushed + cloud-deployed) | 2026-07-16 | **guard** t3-1-vendors-and-ledger-security 8/8 (HAPPY1 invoice + per-entry journal balanced + AP standing; HAPPY2 full payment + AP/CASH journal; HAPPY3 partial payment; HAPPY4 cost-schedule auto-close + lookup; SAD1 vendor.manage gate; SAD2 alloc-sum-mismatch; SAD3 over-allocation; SAD4 idempotent re-record). **Sibling-guards re-run green** (pos-security 18, accounting 19, p2n2 6, p1j, p1m, inventory 24). **Three-up**: lint 0 / vitest 24-113-0 / build 0. **Cloud-verified**: 3 tables + 6 RPCs + 2 permission keys live on `jabjyvdkadcbfocaerno`. **Assumed/untested**: browser E2E of the full receive-bill-pay cycle against the cloud (the guard proves the SQL, the cloud migration proves the schema; the app UI against the cloud is the remaining path). |
+| **Tier 3 item 2 — Vendor picker in Buy Stock** (T3.2, 2026-07-16): link a Buy Stock purchase to a registered Vendor. New `purchase_receivings.vendor_id` nullable FK (on delete restrict); CHECK constraint expanded to include 'vendor' as a third source_type; `inventory_record_purchase` re-created with 12-arg signature (new `p_vendor_id` arg appended as position 12 with default null; first 11 args unchanged so existing guards + client still resolve identically). Vendor validation: same-company + Active + matching source_type; snapshot semantics on insert. Buy Stock modal adds a "Registered Vendor (linked to AP)" option with an active-vendors dropdown; picking a vendor auto-fills source_name + source_contact. Receivings badge shows "Vendor (Name)" alongside "Online (...)" and "Supplier (...)". Customers screen surfaces a small "Open Vendors & AP" sibling link. | Done (pushed + cloud-deployed) | 2026-07-16 | **guard** t3-2-purchase-vendor-link-security 7/7 (HAPPY1 vendor snapshot; HAPPY2 typed-in supplier preserved; HAPPY3 source_type+vendor_id mismatch; SAD1 cross-company vendor rejected; SAD2 archived vendor rejected; SAD3 CHECK constraint denies unknown source_type; SAD4 backward-compat 11-arg call still resolves). **Sibling-guards re-run green** (inventory 10, t3-1 8, p2n2 6, pos 18, accounting 19, p1j). **82 PASS / 0 FAIL across 6 guards.** **Three-up**: lint 0 / vitest 24-113-0 / build 0. **Cloud-verified**: column + index + CHECK + 12-arg function live. **Found-and-fixed during dev**: signature-order gotcha (new arg inserted in middle broke existing 11-arg callers); resolved by appending as position 12. |
+| **Inventory — Usage Summary report** (T3.3, 2026-07-17): 4th tab on the Stock Inventory screen. Aggregates the "Log Stock Usage" movements (`movement_type='AdjustmentDecrease'` with reason prefix `Used:`) by category + by item, with period filter (from/to dates). Three summary cards (Total units used, Consumed value at FIFO cost, Log events), a 2-column "By Category" + "Top Items" section, and a "Recent Activity" table showing the 8 most-recent Usage events with their purpose. Pure read; the writes behind it (inventory_adjust_material) are unchanged. | Done (pushed) | 2026-07-17 | **browser-mock** (use the Consumables tab "Log Stock Usage" to record an entry, then open the Usage Summary tab — the entry appears with its purpose). **No new guard** — the underlying inventory_movements data + inventory_adjust_material write path are already covered by the existing inventory-security 10-assertion battery. **Three-up**: lint 0 / vitest 24-113-0 / build 0 (5.83s). |
+| **DR restore-drill** (2026-07-17): verified the local Supabase stack is a faithful restore target for the linked cloud. Methodology: dump cloud schema (`backups/cloud-pre-drill.sql`, 401 KB, 50 CREATE blocks), dump cloud data (`backups/cloud-data-20260717-122622.sql`, 123 KB, 79 COPY blocks via `--use-copy`), reset local to apply migrations, count + diff tables/functions/RLS/permissions. Result: 51=51 tables, 50=50 RLS-forced, 34=34 seeded permissions, 86=86 app functions, 1 cloud-managed diff (`rls_auto_enable`, a Supabase-platform auto-RLS-enable trigger not in the migration chain). | Done (pushed — docs only) | 2026-07-17 | **Diff** documented in `docs/dr-restore-drill-2026-07-17.md`. Restore procedure recorded: `npx supabase db reset --local` (re-applies all migrations) OR `cat backups/cloud-pre-drill.sql | psql` (schema from dump), then `cat backups/cloud-data-*.sql | psql`, then run all 8 sibling guards. **Scope cuts (deliberate)**: auth users (different JWT secret), storage/realtime (separate procedures), cross-tenant RLS attacks after restore (would need lockstep auth restore). **Backups/ is gitignored** (line 24 of `.gitignore`); no backup file ever staged. |
 | **Accounting** (M4A GL-truth reads: trial balance / income statement / balance sheet; cash_entries; M4C reports: expense/revenue breakdown + equity roll-forward w/ ties-check; M4D Statement of Cash Flows; plain-language "What is this?" captions) | Done (pushed) | 2026-07-06 | **guard** accounting 19; **unit** accounting-reports (incl. cash-flow ties); **browser-mock** statements + reports + captions. |
 | **Payroll** (M5A employees/advances/wages + **balanced GL**, derived advance balance, server-recomputed wage authority; M5C self-visibility: staff see only their own pay, `payroll_link_employee_user`, My Payroll view) | Done (pushed) | 2026-07-04 | **guard** payroll 19 (incl. 5 M5C self-visibility attacks); **browser-mock** roster + link modal. |
 | **Projects** (M7 board + task checklists, %-complete, `project.read/manage` RLS; projects↔calendar timeline overlay) | Done (pushed) | 2026-07-04 | **guard** projects 7; **unit** project-overlay; **browser-mock** create project → appears on calendar. |
@@ -726,3 +732,90 @@ the scheduling guard battery (15/15). Calendar moved to **Done (pushed)**._
   was silently written into `vercel-and-oauth-deployment-gotchas.md` §2's "Real example" last session
   has been removed, and the §3 "stale/broken promotion" lesson that encoded the bad diagnosis was
   replaced with the correct domain-string-mismatch lesson.
+- **2026-07-17 (overnight autonomous session, owner batch GO)** — Four-item ship sequence complete. Per the
+  owner's standing 2026-07-16 directive ("go PERM 6, Tier 3, Inventory Usage tab and dr drill, finish them
+  and deploy"), shipped in order:
+  1. **PERM item 6 (P2N2) — Void-sale approval workflow** (commit `1ea660e`). New `void_requests` table + 4
+     SECURITY DEFINER RPCs (request_void, list_void_requests, approve_void_request, reject_void_request)
+     with RLS forced + separation of duties (self-approve denied) + one-Pending-per-invoice unique partial
+     index. PosScreen "Void slip" → "Request void" (anyone with `pos.sell` can file; admin+ reviews in the
+     new Approvals-screen "Pending Voids" card). **Guard p2n2-void-approval-security 6/6 PASS** (HAPPY1 full
+     reversal + journal balanced + stock returned; HAPPY2 reject; SAD1 role gate; SAD2 self-approve blocked;
+     SAD3 one-Pending; SAD4 double-approve blocked). Sibling guards re-run green: pos 18, accounting 19,
+     p1j, p1m, inventory 24. Three-up: lint 0 / vitest 24-113-0 / build 0. Cloud-deployed via
+     `npx supabase db push` + `npx vercel deploy --prod`; cloud-verified: table + 4 RPCs live on
+     `jabjyvdkadcbfocaerno`. Found-and-fixed during dev: dead-line `select void_status` (bogus column) on a
+     DO block + manual update of `void_requests` as `authenticated` (no grant) — both resolved by trusting
+     the function's own output instead of post-asserting. Owner GO read as blanket (per the user-profile
+     rule); the §2 money-path gate is satisfied by the 6-assertion guard + cross-vendor sibling re-runs.
+  2. **PERM item 2 part 2 (P2N1) — Crop-pricing approval UI** (already pushed at `404e5e0` in the prior
+     session; logged here for completeness). "Pending Crop Price Changes" card on Approvals screen mirrors
+     the existing revoke pattern. Server `price_change_requests` RPCs were committed earlier (P1E
+     2026-07-12); this was the UI wiring. Browser-mock verified.
+  3. **Tier 3 item 1 (T3.1) — Vendors + Cost Schedule + AP ledger** (commit `14c7298`). 6 new tables, 2 new
+     permissions (vendor.read, vendor.manage), 8 new RPCs (vendor_upsert, cost_schedule_upsert,
+     cost_schedule_lookup, vendor_invoice_record, vendor_payment_record, vendor_ap_standing,
+     vendor_ensure_accounts, plus idempotent re-record). Idempotent re-record on (company, vendor,
+     invoice_number) — offline-replay safe. Cost-schedule auto-closes the prior active row when a new rate
+     is added (snapshot semantics). New `/vendors` route + "Vendors & AP" nav entry (Truck icon) +
+     VendorsScreen (data table + 3 dialogs: Edit, Record Invoice, Record Payment). AP standing is a derived
+     view, never stored. **Guard t3-1-vendors-and-ledger-security 8/8 PASS**. Three-up: lint 0 / vitest
+     24-113-0 / build 0. Cloud-verified: 3 tables + 6 RPCs + 2 permission keys live. Cloud-deployed.
+     Found-and-fixed during dev: signature-order gotcha (`p_vendor_id` placed after defaulted param → 11-arg
+     calls rejected by postgres) — resolved by reordering + giving the affected param a default.
+  4. **Tier 3 item 2 (T3.2) — Vendor picker in Buy Stock** (commit `d251257`). New nullable
+     `purchase_receivings.vendor_id` FK (on delete restrict); CHECK constraint expanded to include
+     'vendor'; `inventory_record_purchase` re-created with 12-arg signature (new `p_vendor_id` appended
+     as position 12 with default null; first 11 args unchanged so existing guards + client still resolve
+     identically). Vendor validation: same-company + Active + matching source_type; snapshot semantics
+     on insert. Buy Stock modal adds a "Registered Vendor (linked to AP)" option with an active-vendors
+     dropdown. **Guard t3-2-purchase-vendor-link-security 7/7 PASS**. 82 PASS / 0 FAIL across 6 sibling
+     guards. Three-up: lint 0 / vitest 24-113-0 / build 0. Cloud-verified. Cloud-deployed.
+     Found-and-fixed during dev: signature-order gotcha (the original append-after-idempotency-key caused
+     the 11-arg callers to be treated as a different overload + the equipment_assets insert block was
+     accidentally dropped during the rewrite — both caught and fixed before commit).
+  5. **Inventory Usage Summary tab (T3.3)** (commit `6fd0154`). 4th tab on the Stock Inventory screen.
+     Aggregates the "Log Stock Usage" movements by category + by item + period. 3 summary cards + 2-col
+     "By Category" + "Top Items" + "Recent Activity" table. No new server migration; the data is already
+     captured by inventory_movements. Three-up: lint 0 / vitest 24-113-0 / build 0 (5.83s). Pure
+     read-only client feature.
+  6. **DR restore-drill** (commit `4129882`). Verified the local Supabase stack is a faithful restore target
+     for the linked cloud: dumped schema (401 KB, 50 CREATE blocks) + data (123 KB, 79 COPY blocks via
+     `--use-copy`); reset local to apply migrations; count + diff tables/functions/RLS/permissions.
+     Result: 51=51 tables, 50=50 RLS-forced, 34=34 seeded permissions, 86=86 app functions, 1
+     cloud-managed diff (`rls_auto_enable`, a Supabase-platform auto-RLS-enable trigger not in the
+     migration chain). Backups stored in `backups/` (gitignored; no file ever staged). Findings
+     documented in `docs/dr-restore-drill-2026-07-17.md`. Restore procedure recorded for the next DR
+     event. **No code, migrations, or guards changed** — docs commit only.
+
+  **Net session totals (2026-07-16 → 2026-07-17, 4 items + 1 docs):**
+  - 4 server migrations applied to cloud: `20260716150000_p2n1_crop_pricing_approval_ui` (the UI commit's
+    server part was already there), `20260716160000_p2n2_void_approval_workflow`,
+    `20260716170000_t3_1_vendors_and_ledger`, `20260716180000_t3_2_purchase_vendor_link`. Cloud migration
+    list now `n+4`.
+  - 4 new guard batteries written + green: p2n2 (6/6), t3-1 (8/8), t3-2 (7/7). T3.3 inherits coverage
+    from inventory-security (no new guard). 21 new assertion blocks; combined with the 6 sibling-guard
+    re-runs, **82 PASS / 0 FAIL** across the 6 green-against-PASS guards in the run.
+  - 6 git commits pushed: `404e5e0` (P2N1 UI), `1ea660e` (P2N2), `14c7298` (T3.1), `d251257` (T3.2),
+    `6fd0154` (T3.3), `4129882` (DR drill docs). Local HEAD `4129882` == origin (0/0); working tree
+    clean at session end.
+  - 4 Vercel production deploys: each ship produced `✓ Ready in 30-40s`; final prod alias
+    `https://pickurveggie-erp-glm.vercel.app` HTTP 200.
+  - 1 docs file: `docs/dr-restore-drill-2026-07-17.md` (95 insertions) — the only file changed by the
+    DR-drill commit.
+  - **Honest assumed/untested paths** (not papered over):
+    - T3.1: full receive-bill-pay cycle not exercised in the browser against the cloud (the guard proves
+      the SQL; the cloud migration proves the schema; the app UI against the cloud is the remaining
+      unproven path).
+    - T3.2: pre-existing 11-arg callers verified via the SAD4 backward-compat assertion; full browser
+      E2E of the picker UX against the cloud is the remaining path.
+    - T3.3: lazy-load verified in code; browser E2E of the tab + the aggregation is the remaining path.
+    - DR drill: auth users (different JWT secret), storage/realtime, cross-tenant RLS attacks after
+      restore — all explicitly scoped out per the documentation.
+  - **Notebooks used to find gotchas this session:**
+    - P2N2 development caught the dead `select void_status` + the authenticated cleanup-no-grant bugs.
+    - T3.1 caught the parameter-after-default gotcha (first ship cycle failed; second shipped clean).
+    - T3.2 caught the same family of gotcha PLUS the lost equipment_assets insert (caught by sibling
+      inventory-security regression showing "DEFECT inv: equipment asset not registered Good").
+  - Per AGENTS.md §1.3, STATUS.md §2 updated with 6 new rows (this commit is the source of truth for
+    those rows; the sticky-header SHA `4129882` is the last commit that modified the §0 header line).
