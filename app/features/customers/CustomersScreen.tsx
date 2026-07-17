@@ -1,6 +1,7 @@
 // Customers & Credit (P2-M9A / B1) — customer master + read-only receivable/credit standing, and attribution of
 // unpaid credit sales to a customer (non-money: no GL, no amount change). Credit-limit ENFORCEMENT in the sale is
 // deferred to the pending money-path review (spec §Deferred). All writes via customersApi (RLS-gated; B5-queued).
+import {NavLink} from 'react-router-dom';
 import {useCallback, useEffect, useState} from 'react';
 import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
@@ -102,6 +103,15 @@ export default function CustomersScreen() {
         subtitle="Track regular buyers and their outstanding receivables against an optional credit limit."
         action={canManage ? <Button onClick={openCreate}><Plus size={18} aria-hidden /> New Customer</Button> : undefined}
       />
+
+      {/* T3.2 follow-on (2026-07-16): sibling entry to the Vendors & AP screen. A single-line
+          link keeps the relationship between customer-side AR and vendor-side AP explicit. */}
+      {has('vendor.read') ? (
+        <Card className="flex items-center justify-between gap-3 py-3">
+          <p className="text-sm text-farm-muted">Looking for the payables side?</p>
+          <NavLink to="/vendors" className="rounded-lg bg-farm-green px-3 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-farm-green-dark">Open Vendors & AP →</NavLink>
+        </Card>
+      ) : null}
 
       {standing === null ? (
         <Skeleton rows={4} />

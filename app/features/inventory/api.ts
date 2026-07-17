@@ -52,10 +52,14 @@ export interface PurchaseInput {
   isEquipment: boolean;
   quantity: number;
   totalCost: number;
-  sourceType: 'online' | 'physical';
+  sourceType: 'online' | 'physical' | 'vendor';
   sourceName: string;
   sourceContact?: string;
   purchaseDate: string; // yyyy-mm-dd
+  // T3.2 (2026-07-16): optional FK to vendors. When set + sourceType='vendor', the receiving
+  // is linked to the vendor master (and source_name + source_contact are snapshotted from the
+  // vendor at the time of receipt). Ignored for sourceType='online'|'physical'.
+  vendorId?: string | null;
 }
 
 export const inventoryApi = {
@@ -125,6 +129,7 @@ export const inventoryApi = {
         quantity: input.quantity, total_amount: round2(input.totalCost),
         source_type: input.sourceType, source_name: input.sourceName.trim() || 'Local Supplier',
         source_contact: input.sourceContact?.trim() || null, received_date: input.purchaseDate, created_at: now,
+        vendor_id: input.vendorId ?? null,
       });
       await mockBumpStock(companyId, item.id, branchId, input.quantity);
       if (input.isEquipment) {
@@ -142,6 +147,8 @@ export const inventoryApi = {
       p_source_type: input.sourceType, p_source_name: input.sourceName.trim() || 'Local Supplier',
       p_source_contact: input.sourceContact?.trim() || null, p_purchase_date: input.purchaseDate,
       p_idempotency_key: idem,
+      // T3.2: pass vendor_id (12th arg) only when set; RPC accepts default-null otherwise
+      p_vendor_id: input.vendorId ?? null,
     };
     if (online()) {
       const {error} = await supabase.rpc('inventory_record_purchase', payload);

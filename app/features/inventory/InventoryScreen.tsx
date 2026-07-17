@@ -4,6 +4,7 @@
 // mandatory). Equipment tab: catalog + condition checklist + inspection history. All writes via inventoryApi
 // (governed functions; B5 offline-queued).
 import {useCallback, useEffect, useMemo, useState} from 'react';
+import {NavLink} from 'react-router-dom';
 import {useLiveQuery} from 'dexie-react-hooks';
 import * as Dialog from '@radix-ui/react-dialog';
 import {AlertTriangle, ClipboardList, FileText, Hammer, Minus, Package, Plus, ReceiptText, RefreshCw, ShieldAlert, ShoppingBag, X} from 'lucide-react';
@@ -16,6 +17,7 @@ import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
 import {formatPeso, round2} from '../pos/money';
 import {inventoryApi, type PurchaseInput} from './api';
+import {vendorsApi, type Vendor} from '../vendors/api';
 import {purchaseSummary, filterByPeriod} from './purchaseSummary';
 import type {EquipmentAsset, EquipmentLog, InventoryItem, ItemCategory, PurchaseReceiving} from '../../types/db';
 
@@ -57,6 +59,14 @@ export default function InventoryScreen() {
   }, [companyId, branchId]);
   useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs inventory lists (item 4 fan-out)
 
+  // T3.2 (2026-07-16): load the active vendor list so the Buy Stock modal can offer a "Vendor"
+  // source type that links the receiving to the Vendors & AP master. Cached locally; reload
+  // on refreshTick so the picker stays current.
+  useEffect(() => {
+    if (!companyId) return;
+    vendorsApi.list().then((rows) => setVendors(rows.filter((v) => v.status === 'Active'))).catch(() => setVendors([]));
+  }, [companyId, refreshTick]);
+
   // ── purchase modal ──
   const [buyOpen, setBuyOpen] = useState(false);
   const [buyDate, setBuyDate] = useState(todayISO());
@@ -64,9 +74,11 @@ export default function InventoryScreen() {
   const [buyCategory, setBuyCategory] = useState('seeds');
   const [buyDesc, setBuyDesc] = useState('');
   const [buyQty, setBuyQty] = useState('1');
-  const [buySourceType, setBuySourceType] = useState<'online' | 'physical'>('online');
+  const [buySourceType, setBuySourceType] = useState<'online' | 'physical' | 'vendor'>('online');
   const [buySourceName, setBuySourceName] = useState('Lazada');
   const [buyContact, setBuyContact] = useState('');
+  const [buyVendorId, setBuyVendorId] = useState<string | null>(null);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
   const [buyAmount, setBuyAmount] = useState('');
 
   // ── adjustment modal ──
@@ -133,7 +145,7 @@ export default function InventoryScreen() {
     setBuyDate(todayISO());
     setBuyType('Consumables');
     setBuyCategory(prefillCategoryKey ?? 'seeds');
-    setBuyDesc(''); setBuyQty('1'); setBuySourceType('online'); setBuySourceName('Lazada'); setBuyContact(''); setBuyAmount('');
+    setBuyDesc(''); setBuyQty('1'); setBuySourceType('online'); setBuySourceName('Lazada'); setBuyContact(''); setBuyVendorId(null); setBuyAmount('');
     if (prefillCategoryKey) {
       const cat = categories.find((c) => c.category_key === prefillCategoryKey);
       const latest = receivings.find((r) => itemById.get(r.item_id)?.category_id === cat?.id);
@@ -154,6 +166,9 @@ export default function InventoryScreen() {
       itemName: buyDesc, isEquipment: buyType === 'Equipment',
       quantity: parseFloat(buyQty), totalCost: parseFloat(buyAmount),
       sourceType: buySourceType, sourceName: buySourceName, sourceContact: buyContact, purchaseDate: buyDate,
+      // T3.2 (2026-07-16): when source='vendor', pass the picked vendor id so the receiving
+      // is linked to the vendor master. The RPC snapshots the vendor's name + contact.
+      vendorId: buySourceType === 'vendor' ? buyVendorId : null,
     };
     if (!(input.quantity > 0) || !(input.totalCost > 0)) return notify('Amounts and counts must be larger than zero.', 'error');
     setBusy(true);
@@ -322,7 +337,7 @@ export default function InventoryScreen() {
                   {latest ? (
                     <div className="mt-4 space-y-1 border-t border-farm-accent-soft pt-3 text-[11px] text-farm-muted">
                       <p>Last Restocked: <span className="font-mono font-semibold text-farm-ink">{latest.received_date}</span></p>
-                      <p>Source: <span className="rounded bg-farm-bg px-1.5 py-0.5 font-semibold uppercase text-farm-ink">{latest.source_type === 'online' ? `Online (${latest.source_name})` : `Supplier (${latest.source_name})`}</span></p>
+                      <p>Source: <span className="rounded bg-farm-bg px-1.5 py-0.5 font-semibold uppercase text-farm-ink">{latest.source_type === 'online' ? `Online (${latest.source_name})` : latest.source_type === 'vendor' ? `Vendor (${latest.source_name})` : `Supplier (${latest.source_name})`}</span></p>
                     </div>
                   ) : null}
                   {canPurchase ? (
@@ -518,12 +533,18 @@ export default function InventoryScreen() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted">Purchase Location</label>
-                  <SelectField value={buySourceType} onChange={(v) => {const t = v as 'online' | 'physical'; setBuySourceType(t); setBuySourceName(t === 'online' ? 'Lazada' : '');}} options={[{value: 'online', label: 'Online eCommerce Platforms'}, {value: 'physical', label: 'Physical Dealer / Supplier Store'}]} />
+                  <SelectField value={buySourceType} onChange={(v) => {const t = v as 'online' | 'physical' | 'vendor'; setBuySourceType(t); if (t === 'online') {setBuySourceName('Lazada'); setBuyVendorId(null);} else if (t === 'physical') {setBuySourceName(''); setBuyVendorId(null);} else {setBuySourceName(''); setBuyVendorId(null);}}} options={[{value: 'online', label: 'Online eCommerce Platforms'}, {value: 'physical', label: 'Physical Dealer / Supplier Store'}, {value: 'vendor', label: 'Registered Vendor (linked to AP)'}]} />
                 </div>
                 <div>
                   <label className="mb-1 block text-[10px] font-bold uppercase text-farm-muted" htmlFor="buy-src">Source / Platform Name</label>
                   {buySourceType === 'online' ? (
                     <SelectField value={buySourceName} onChange={setBuySourceName} options={ONLINE_SOURCES.map((s) => ({value: s, label: `${s} Philippines`}))} />
+                  ) : buySourceType === 'vendor' ? (
+                    vendors.length === 0 ? (
+                      <p className="min-h-12 rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-3 text-sm text-farm-muted">No active vendors yet. <NavLink to="/vendors" className="font-bold text-farm-green underline">Add one in Vendors & AP</NavLink>, or pick "Physical Dealer" to type a supplier name.</p>
+                    ) : (
+                      <SelectField value={buyVendorId ?? ''} placeholder="Choose a registered vendor…" onChange={(v) => {const id = v || null; setBuyVendorId(id); const found = vendors.find((vd) => vd.id === id); if (found) {setBuySourceName(found.name); setBuyContact(found.contact ?? '');}}} options={vendors.map((v) => ({value: v.id, label: `${v.vendor_code} — ${v.name}`}))} />
+                    )
                   ) : (
                     <input id="buy-src" value={buySourceName} onChange={(e) => setBuySourceName(e.target.value)} placeholder="e.g. Agri-Supply Co. Malolos" className="min-h-12 w-full rounded-lg border border-farm-accent-soft bg-farm-bg px-3 text-sm" />
                   )}

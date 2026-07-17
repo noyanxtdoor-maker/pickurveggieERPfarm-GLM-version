@@ -253,11 +253,14 @@ export interface PurchaseReceiving {
   item_id: string;
   quantity: number;
   total_amount: number;
-  source_type: 'online' | 'physical';
+  source_type: 'online' | 'physical' | 'vendor';
   source_name: string;
   source_contact: string | null;
   received_date: string; // date
   created_at: string;
+  // Tier 3 follow-on: optional FK to vendors.id (set when source_type='vendor' AND the picker
+  // resolved a registered vendor). NULL for legacy rows and for vendor-name-only entries.
+  vendor_id?: string | null;
 }
 
 export interface EquipmentAsset {
