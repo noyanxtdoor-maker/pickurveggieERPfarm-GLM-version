@@ -205,7 +205,7 @@ export interface PosInvoice {
   change_amount: number;
   note: string | null;
   customer_id?: string | null; // P2-M9A: optional customer attribution (credit sales)
-  status: 'Paid' | 'Unpaid' | 'Voided' | 'PendingSync';
+  status: 'Paid' | 'Unpaid' | 'Voided' | 'PendingSync' | 'PendingVoid';
   created_at: string;
 }
 

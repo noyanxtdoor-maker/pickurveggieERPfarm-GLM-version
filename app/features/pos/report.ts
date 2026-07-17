@@ -16,7 +16,7 @@ export interface ReportSale {
   total: number;
   discount: number;
   delivery_fee: number;
-  status: 'Paid' | 'Unpaid' | 'Voided' | 'PendingSync';
+  status: 'Paid' | 'Unpaid' | 'Voided' | 'PendingSync' | 'PendingVoid';
   sale_type: 'retail' | 'wholesale'; // wholesale = any bulk (Skip Weigh) line — prototype Transaction.type
   cashier: string | null; // canonical: created_by user id; device cache: posted_by display name; null = unknown
   created_at: string;

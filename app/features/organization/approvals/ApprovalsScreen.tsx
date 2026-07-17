@@ -25,6 +25,7 @@ import {payrollApi} from '../../payroll/api';
 import {OverridesDialog} from '../overrides/overrides';
 import {revokeRequestsApi, type RevokeRequest} from '../revoke-requests/revokeRequests';
 import {priceChangeRequestsApi, type PriceChangeRequest} from '../../inventory/priceChangeRequests';
+import {voidRequestsApi, type VoidRequest} from '../../pos/voidRequests';
 import {MOCK_MODE, DEMO} from '../../../core/mock/mock';
 
 // P1D §Part1: rank<40 (below co_owner) = a role that implies paid work — approving/assigning it requires
@@ -59,6 +60,9 @@ export default function ApprovalsScreen() {
   const {triggerSync, refreshTick} = useSync();
   const canManage = has('membership.manage');
   const canManageProducts = has('product.manage');
+  // P2N2 (2026-07-16): void approval is admin+ (pos.void). Operator/cashier/employee can FILE
+  // a void request (gated on pos.sell in PosScreen) but cannot approve.
+  const canApproveVoid = has('pos.void');
   const canManageJobTitle = has('job_title.manage');
   const [jobTitleTarget, setJobTitleTarget] = useState<MemberRow | null>(null);
   const [jobTitleValue, setJobTitleValue] = useState('');
@@ -94,6 +98,12 @@ export default function ApprovalsScreen() {
   const [priceReqs, setPriceReqs] = useState<PriceChangeRequest[] | null>(null);
   const [priceRejectTarget, setPriceRejectTarget] = useState<PriceChangeRequest | null>(null);
   const [priceRejectReason, setPriceRejectReason] = useState('');
+  // P2N2 (2026-07-16): the void-approval queue (server: list_void_requests, pos.void-gated).
+  // The requester may be ANY member with pos.sell (cashier+); the approver must hold pos.void
+  // (admin+) AND must be a DIFFERENT actor (separation of duties — same as P1J revoke).
+  const [voidReqs, setVoidReqs] = useState<VoidRequest[] | null>(null);
+  const [voidRejectTarget, setVoidRejectTarget] = useState<VoidRequest | null>(null);
+  const [voidRejectReason, setVoidRejectReason] = useState('');
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
 
   // P1D §Part1: the unified approve/reassign dialog — see AssignTarget above.
@@ -113,6 +123,7 @@ export default function ApprovalsScreen() {
     if (canManage) authApi.listPendingUsers().then(setPending).catch(() => setPending([]));
     if (canManage) revokeRequestsApi.list().then(setRevokeReqs).catch(() => setRevokeReqs([]));
     if (canManageProducts) priceChangeRequestsApi.list().then(setPriceReqs).catch(() => setPriceReqs([]));
+    if (canApproveVoid) voidRequestsApi.list().then(setVoidReqs).catch(() => setVoidReqs([]));
     if (canManage) payrollApi.fetchPositions(companyId).then(setPositions).catch(() => setPositions([]));
     if (canManage) membershipsApi.unlinkedPayrollEligible(companyId).then((rows) => setUnlinkedEligible(new Set(rows.map((r) => r.user_id)))).catch(() => setUnlinkedEligible(new Set()));
     // Real mode on a fresh device: the branch/role dropdowns read the Dexie cache, which is empty until the
@@ -314,6 +325,32 @@ export default function ApprovalsScreen() {
       setPriceRejectReason('');
       reload();
     } catch (e) { notify(e instanceof Error ? e.message : 'Reject price failed', 'error'); } finally { setBusy(false); }
+  }
+
+  // P2N2 (PERM item 6): void-sale approval workflow. Any member with pos.sell can FILE
+  // (request_void from PosScreen); admin+ (pos.void) APPROVE here inlines the pos_void_sale
+  // reversal math (journal + stock returns + invoice -> Voided) with separation of duties
+  // (approver != requester). The slip number is what the cashier saw in the POS terminal.
+  async function approveVoid(req: VoidRequest) {
+    setBusy(true);
+    try {
+      await voidRequestsApi.approve(req.id);
+      await triggerSync();
+      notify(`Slip #${String(req.invoice_number ?? '—').padStart(5, '0')} voided (stock returned, books reversed)`);
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Approve void failed', 'error'); } finally { setBusy(false); }
+  }
+  async function commitRejectVoid() {
+    if (!voidRejectTarget) return;
+    setBusy(true);
+    try {
+      await voidRequestsApi.reject(voidRejectTarget.id, voidRejectReason);
+      await triggerSync();
+      notify(`Void request for slip #${String(voidRejectTarget.invoice_number ?? '—').padStart(5, '0')} rejected`);
+      setVoidRejectTarget(null);
+      setVoidRejectReason('');
+      reload();
+    } catch (e) { notify(e instanceof Error ? e.message : 'Reject void failed', 'error'); } finally { setBusy(false); }
   }
 
   return (
@@ -651,6 +688,74 @@ export default function ApprovalsScreen() {
           </ul>
         </Card>
       ) : null}
+
+      {/* P2N2 (2026-07-16): Pending Voids — admin+ (pos.void) reviews requests from any member
+          with pos.sell (cashier+). Approve inlines the pos_void_sale reversal math (stock returns
+          + reversing journal + invoice -> Voided) with separation of duties (approver != requester).
+          Reject requires a reason. Mirrors Pending Crop Price Changes + Pending Revoke. */}
+      {canApproveVoid && voidReqs != null && voidReqs.length > 0 ? (
+        <Card>
+          <h3 className="mb-2 flex items-center gap-2 text-lg font-bold text-farm-warn"><Clock3 className="h-5 w-5" aria-hidden /> Pending Voids</h3>
+          <p className="mb-3 text-xs text-farm-muted">These void requests were filed from the POS. Approving runs the reversal: stock is returned, the revenue journal entry is reversed, and the invoice is marked Voided. You cannot approve your own request (separation of duties — ask another admin+).</p>
+          <ul className="divide-y divide-farm-accent-soft">
+            {voidReqs.map((r) => (
+              <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-3">
+                <div>
+                  <p className="text-sm font-bold text-farm-ink">Slip #{String(r.invoice_number ?? '—').padStart(5, '0')} <span className="font-normal text-farm-muted">· {r.branch_name ?? 'branch'}</span></p>
+                  <p className="text-xs text-farm-muted">
+                    {r.reason}
+                    {' '}· {r.requester_name ?? 'a member'} · {new Date(r.created_at).toLocaleDateString('en-PH', {month: 'short', day: 'numeric'})}
+                  </p>
+                </div>
+                <span className="flex gap-1.5">
+                  <button onClick={() => void approveVoid(r)} disabled={busy}
+                    className="rounded-lg bg-farm-green px-3 py-1.5 text-xs font-bold text-white hover:opacity-90">
+                    Approve
+                  </button>
+                  <button onClick={() => setVoidRejectTarget(r)} disabled={busy}
+                    className="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-farm-danger hover:bg-red-100">
+                    Reject
+                  </button>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {/* P2N2 (2026-07-16): reject-with-reason dialog for void reject. Required because
+          reject_void_request is RPC with a non-null reason arg. Mirrors the price-reject dialog. */}
+      <Dialog.Root open={voidRejectTarget !== null} onOpenChange={(o) => {if (!o) {setVoidRejectTarget(null); setVoidRejectReason('');}}}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[92vw] max-w-sm -translate-x-1/2 -translate-y-1/2 rounded-2xl bg-farm-card p-6 shadow-xl">
+            <Dialog.Title className="mb-2 text-lg font-bold text-farm-danger">
+              {voidRejectTarget ? `Reject void for slip #${String(voidRejectTarget.invoice_number ?? '—').padStart(5, '0')}?` : ''}
+            </Dialog.Title>
+            <Dialog.Description className="mb-4 text-sm text-farm-muted">
+              The slip stays at its current status (Paid or Unpaid). The requester will see this reason in their audit log.
+            </Dialog.Description>
+            <textarea
+              value={voidRejectReason}
+              onChange={(e) => setVoidRejectReason(e.target.value)}
+              placeholder="Reason (required) — e.g. wrong slip; reopen & re-finalize"
+              rows={3}
+              className="min-h-20 w-full resize-none rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-2 text-sm"
+              aria-label="Reason for void reject"
+            />
+            <div className="mt-5 flex gap-2 border-t border-farm-accent-soft pt-4">
+              <Button variant="secondary" onClick={() => {setVoidRejectTarget(null); setVoidRejectReason('');}} disabled={busy}>Cancel</Button>
+              <Button
+                className="flex-1"
+                disabled={busy || voidRejectReason.trim().length < 3}
+                onClick={() => void commitRejectVoid()}
+              >
+                {busy ? 'Saving…' : 'Confirm reject'}
+              </Button>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       <ConfirmDialog
         open={archiveTarget !== null}

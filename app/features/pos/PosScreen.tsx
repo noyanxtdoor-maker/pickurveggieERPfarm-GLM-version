@@ -15,6 +15,7 @@ import {EmptyState, Skeleton, useToast} from '../../components/feedback';
 import {SelectField} from '../../components/overlay';
 import {Numpad} from './Numpad';
 import {posApi, type SaleLineInput, type SaleResult} from './api';
+import {voidRequestsApi} from './voidRequests';
 import {RECEIPT_SIZES, useReceiptSize} from './useReceiptSize';
 import {farmPerKg, formatPeso, lineTotal, round2} from './money';
 import {customersApi} from '../customers/api';
@@ -32,7 +33,10 @@ export default function PosScreen() {
   const {notify} = useToast();
   const canSell = has('pos.sell');
   const canSettle = has('pos.settle');
-  const canVoid = has('pos.void');
+  // PERM 6 (2026-07-16): void is now an approval-queue workflow. Anyone with pos.sell can
+  // REQUEST a void (file for an admin+ to approve). Instant-approval via pos.void is no longer
+  // surfaced from the POS — separation of duties requires a second admin+ to approve.
+  const canVoid = has('pos.sell');
   const canManageProducts = has('product.manage');
 
   const branches = useLiveQuery(async () => (companyId ? offlineDB.branches.where('company_id').equals(companyId).filter((b) => b.status === 'Active').toArray() : []), [companyId]);
@@ -215,12 +219,16 @@ export default function PosScreen() {
     if (busy || !companyId || !voidTarget) return;
     setBusy(true);
     try {
-      await posApi.voidSale(companyId, voidTarget, voidReason);
-      notify(`Slip #${voidTarget.invoice_number ?? '—'} voided`);
+      // PERM 6 (2026-07-16): void is now an approval-queue request. The slip is NOT voided
+      // here — an admin+ must approve in the Approvals screen. We optimistically mark the
+      // local Dexie row as 'PendingVoid' so the cashier sees the request is in flight.
+      await voidRequestsApi.request(voidTarget.id, voidReason);
+      await offlineDB.posInvoices.put({...voidTarget, status: 'PendingVoid'});
+      notify(`Void request for slip #${voidTarget.invoice_number ?? '—'} filed — awaiting admin approval`);
       setVoidTarget(null); setVoidReason('');
       reload();
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Void failed', 'error');
+      notify(e instanceof Error ? e.message : 'Void request failed', 'error');
     } finally {
       setBusy(false);
     }
@@ -593,15 +601,15 @@ export default function PosScreen() {
         </div>
       </div>
 
-      {/* void confirmation panel */}
+      {/* void confirmation panel (PERM 6 2026-07-16: now an approval-queue request, not an instant void) */}
       {voidTarget ? (
         <Card className="animate-fade-in border-farm-danger">
-          <h3 className="mb-2 text-lg font-bold text-farm-danger">Void slip #{voidTarget.invoice_number != null ? String(voidTarget.invoice_number).padStart(5, '0') : '—'}?</h3>
-          <p className="mb-3 text-sm text-farm-muted">This appends reversing entries (stock returned, books reversed). It cannot be undone — history is preserved.</p>
+          <h3 className="mb-2 text-lg font-bold text-farm-danger">Request void for slip #{voidTarget.invoice_number != null ? String(voidTarget.invoice_number).padStart(5, '0') : '—'}?</h3>
+          <p className="mb-3 text-sm text-farm-muted">An admin must approve before the reversal runs (stock return + journal entry). History is preserved either way.</p>
           <div className="flex flex-wrap items-center gap-2">
             <input value={voidReason} onChange={(e) => setVoidReason(e.target.value)} placeholder="Reason (required)…" aria-label="Void reason" className="min-h-12 flex-1 rounded-lg border border-farm-accent px-3 text-sm" />
             <Button variant="secondary" onClick={() => {setVoidTarget(null); setVoidReason('');}} disabled={busy}>Cancel</Button>
-            <Button variant="danger" onClick={() => void commitVoid()} disabled={busy || !voidReason.trim()}>{busy ? 'VOIDING…' : 'VOID SLIP'}</Button>
+            <Button variant="danger" onClick={() => void commitVoid()} disabled={busy || !voidReason.trim()}>{busy ? 'FILING…' : 'REQUEST VOID'}</Button>
           </div>
         </Card>
       ) : null}
@@ -702,8 +710,8 @@ export default function PosScreen() {
                         ) : null}
                         {/* Print (owner 2026-07-16): re-print any historical receipt at the configured paper size. */}
                         <button onClick={() => printInvoice(t)} className="inline-flex items-center gap-1 rounded border border-farm-accent-soft bg-farm-bg px-2 py-1 text-xs font-semibold text-farm-green hover:bg-farm-accent-soft" title={`Print slip #${t.invoice_number ?? '—'} (${receiptSize})`}><Printer size={13} aria-hidden /> Print</button>
-                        {t.status !== 'Voided' && t.status !== 'PendingSync' && canVoid ? (
-                          <button onClick={() => {setVoidTarget(t); setVoidReason('');}} className="rounded px-2 py-1 text-xs font-semibold text-farm-danger hover:bg-red-50">Void</button>
+                        {t.status !== 'Voided' && t.status !== 'PendingSync' && t.status !== 'PendingVoid' && canVoid ? (
+                          <button onClick={() => {setVoidTarget(t); setVoidReason('');}} className="rounded px-2 py-1 text-xs font-semibold text-farm-danger hover:bg-red-50">Request void</button>
                         ) : null}
                         {t.status !== 'Voided' && !canVoid && !canSettle ? <Lock className="h-3.5 w-3.5 text-farm-accent" aria-hidden /> : null}
                       </span>
