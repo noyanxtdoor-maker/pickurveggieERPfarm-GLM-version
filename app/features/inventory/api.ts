@@ -8,7 +8,7 @@ import {enqueue} from '../../core/offline/queue';
 import {uuidv7} from '../../core/offline/uuidv7';
 import {MOCK_MODE} from '../../core/mock/mock';
 import {round2} from '../pos/money';
-import type {EquipmentAsset, EquipmentLog, InventoryItem, ItemCategory, PurchaseReceiving} from '../../types/db';
+import type {EquipmentAsset, EquipmentLog, InventoryItem, ItemCategory, PurchaseReceiving, UsageMovement} from '../../types/db';
 
 const online = () => typeof navigator === 'undefined' || navigator.onLine;
 
@@ -102,6 +102,31 @@ export const inventoryApi = {
       .eq('company_id', companyId).eq('branch_id', branchId).order('created_at', {ascending: false}).limit(300);
     if (error) throw new Error(error.message);
     return ((data ?? []) as PurchaseReceiving[]).map((r) => ({...r, quantity: Number(r.quantity), total_amount: Number(r.total_amount)}));
+  },
+
+  // T3.3 (2026-07-17): Inventory Usage Summary support. Fetches the negative inventory
+  // movements whose reason starts with 'Used:' — the output of the "Log Stock Usage" flow
+  // (inventory_adjust_material called with qty_delta < 0 + a "Used: ..." reason). Pure read,
+  // RLS-gated (movements inherit item-branch-company RLS). Date range is optional: empty
+  // strings mean "no bound on that side". Sorted newest-first to match the receivings list.
+  async fetchUsageMovements(companyId: string, branchId: string, fromIso: string = '', toIso: string = ''): Promise<UsageMovement[]> {
+    if (MOCK_MODE) return [];  // usage flow is not modelled in the mock
+    let q = supabase.from('inventory_movements').select('*')
+      .eq('company_id', companyId).eq('branch_id', branchId)
+      .eq('movement_type', 'AdjustmentDecrease')
+      .like('reason', 'Used:%')
+      .order('created_at', {ascending: false})
+      .limit(500);
+    if (fromIso) q = q.gte('created_at', fromIso);
+    if (toIso)   q = q.lte('created_at', toIso);
+    const {data, error} = await q;
+    if (error) throw new Error(error.message);
+    return ((data ?? []) as UsageMovement[]).map((r) => ({
+      ...r,
+      quantity: Number(r.quantity),
+      unit_cost: Number(r.unit_cost),
+      total_cost: Number(r.total_cost),
+    }));
   },
 
   async recordPurchase(companyId: string, branchId: string, input: PurchaseInput): Promise<void> {

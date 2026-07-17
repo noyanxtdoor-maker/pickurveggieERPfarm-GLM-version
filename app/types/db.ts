@@ -263,6 +263,24 @@ export interface PurchaseReceiving {
   vendor_id?: string | null;
 }
 
+// T3.3 (2026-07-17): Inventory Usage Summary — read-only aggregation over inventory_movements
+// where movement_type='AdjustmentDecrease' AND reason LIKE 'Used:%' (the "Log Stock Usage" flow
+// from InventoryScreen). One row per Usage log event.
+export interface UsageMovement {
+  id: string;
+  company_id: string;
+  branch_id: string;
+  item_id: string;
+  material_batch_id: string | null;
+  movement_type: 'AdjustmentDecrease';
+  quantity: number;          // absolute value (the negative sign is implicit in movement_type)
+  unit_cost: number;
+  total_cost: number;
+  reason: string;            // always starts with 'Used:' for the Usage flow
+  created_at: string;        // timestamptz
+  actor_user_id: string;
+}
+
 export interface EquipmentAsset {
   id: string;
   company_id: string;

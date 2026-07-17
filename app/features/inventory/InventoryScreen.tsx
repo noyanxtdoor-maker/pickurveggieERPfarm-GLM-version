@@ -19,7 +19,8 @@ import {formatPeso, round2} from '../pos/money';
 import {inventoryApi, type PurchaseInput} from './api';
 import {vendorsApi, type Vendor} from '../vendors/api';
 import {purchaseSummary, filterByPeriod} from './purchaseSummary';
-import type {EquipmentAsset, EquipmentLog, InventoryItem, ItemCategory, PurchaseReceiving} from '../../types/db';
+import {usageSummary, filterUsageByPeriod} from './usageSummary';
+import type {EquipmentAsset, EquipmentLog, InventoryItem, ItemCategory, PurchaseReceiving, UsageMovement} from '../../types/db';
 
 const todayISO = () => new Date().toISOString().slice(0, 10);
 const ONLINE_SOURCES = ['Lazada', 'Shopee', 'TikTok'];
@@ -41,12 +42,13 @@ export default function InventoryScreen() {
   // screens that warm this cache — without this, the branch picker stays empty on a fresh device).
   useEffect(() => {if (companyId) hydrateBranches(companyId);}, [companyId]);
 
-  const [tab, setTab] = useState<'consumables' | 'equipment' | 'purchases'>('consumables');
+  const [tab, setTab] = useState<'consumables' | 'equipment' | 'purchases' | 'usage'>('consumables');
   const [categories, setCategories] = useState<ItemCategory[]>([]);
   const [items, setItems] = useState<InventoryItem[] | null>(null);
   const [receivings, setReceivings] = useState<PurchaseReceiving[]>([]);
   const [equipment, setEquipment] = useState<EquipmentAsset[]>([]);
   const [logs, setLogs] = useState<EquipmentLog[]>([]);
+  const [usage, setUsage] = useState<UsageMovement[]>([]);
   const [busy, setBusy] = useState(false);
 
   const reload = useCallback(() => {
@@ -58,6 +60,17 @@ export default function InventoryScreen() {
     inventoryApi.fetchEquipmentLogs(companyId).then(setLogs).catch(() => setLogs([]));
   }, [companyId, branchId]);
   useEffect(reload, [reload, refreshTick]); // refreshTick — manual tap-to-sync re-runs inventory lists (item 4 fan-out)
+
+  // T3.3 (2026-07-17): load Usage movements (negative inventory_movements with reason 'Used:%')
+  // when the Usage tab is active. The active tab state isn't reactive enough on its own to
+  // gate this — we keep the load cheap (limit 500) and refetch on tab open via the helper below.
+  const reloadUsage = useCallback(() => {
+    if (!companyId || !branchId) return;
+    inventoryApi.fetchUsageMovements(companyId, branchId).then(setUsage).catch(() => setUsage([]));
+  }, [companyId, branchId]);
+  useEffect(() => {
+    if (tab === 'usage') reloadUsage();
+  }, [tab, reloadUsage, refreshTick]);
 
   // T3.2 (2026-07-16): load the active vendor list so the Buy Stock modal can offer a "Vendor"
   // source type that links the receiving to the Vendors & AP master. Cached locally; reload
@@ -109,6 +122,10 @@ export default function InventoryScreen() {
   const [sumFrom, setSumFrom] = useState('');
   const [sumTo, setSumTo] = useState('');
   const summary = useMemo(() => purchaseSummary(filterByPeriod(receivings, sumFrom, sumTo), itemById, catById), [receivings, sumFrom, sumTo, itemById, catById]);
+  // T3.3 (2026-07-17): Usage Summary state + memo. Shares the itemById/catById maps.
+  const [useFrom, setUseFrom] = useState('');
+  const [useTo, setUseTo] = useState('');
+  const usageSum = useMemo(() => usageSummary(filterUsageByPeriod(usage, useFrom, useTo), itemById, catById), [usage, useFrom, useTo, itemById, catById]);
   const consumableCategories = categories.filter((c) => c.category_key !== 'equipment');
 
   // per-category aggregates (mock cards): total pcs, cumulative ₱, latest restock/source
@@ -274,6 +291,10 @@ export default function InventoryScreen() {
           className={cn('flex min-h-12 items-center gap-2 rounded-t-xl px-6 text-sm font-bold transition', tab === 'purchases' ? 'border-x border-t border-farm-accent bg-farm-card text-farm-green' : 'text-farm-muted hover:bg-farm-card/40 hover:text-farm-green')}>
           <ReceiptText className="h-4 w-4" aria-hidden /> Purchase Summary
         </button>
+        <button role="tab" aria-selected={tab === 'usage'} onClick={() => setTab('usage')}
+          className={cn('flex min-h-12 items-center gap-2 rounded-t-xl px-6 text-sm font-bold transition', tab === 'usage' ? 'border-x border-t border-farm-accent bg-farm-card text-farm-green' : 'text-farm-muted hover:bg-farm-card/40 hover:text-farm-green')}>
+          <ClipboardList className="h-4 w-4" aria-hidden /> Usage Summary
+        </button>
       </div>
 
       {tab === 'purchases' ? (
@@ -375,6 +396,112 @@ export default function InventoryScreen() {
               </div>
             </Card>
           ) : null}
+        </div>
+      ) : tab === 'usage' ? (
+        <div className="animate-fade-in space-y-6">
+          <Card>
+            <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 text-lg font-bold text-farm-green"><ClipboardList className="h-5 w-5" aria-hidden /> Usage Summary</h3>
+                <p className="text-xs text-farm-muted">Every "Log Stock Usage" entry flows in here automatically — see WHAT was used, in what quantity, and FOR WHAT PURPOSE.</p>
+              </div>
+              <div className="flex items-end gap-2">
+                <label className="text-[10px] font-bold uppercase text-farm-muted">From<input type="date" value={useFrom} onChange={(e) => setUseFrom(e.target.value)} className="mt-1 block min-h-10 rounded-lg border border-farm-accent-soft bg-farm-bg px-2 text-sm" /></label>
+                <label className="text-[10px] font-bold uppercase text-farm-muted">To<input type="date" value={useTo} onChange={(e) => setUseTo(e.target.value)} className="mt-1 block min-h-10 rounded-lg border border-farm-accent-soft bg-farm-bg px-2 text-sm" /></label>
+                {useFrom || useTo ? <button onClick={() => {setUseFrom(''); setUseTo('');}} className="min-h-10 rounded-lg border border-farm-accent px-2.5 text-xs font-bold text-farm-green hover:bg-farm-accent-soft">All time</button> : null}
+              </div>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl border border-farm-accent-soft bg-farm-bg p-3">
+                <p className="text-[10px] font-bold uppercase text-farm-muted">Total units used</p>
+                <p className="mt-1 text-2xl font-black text-farm-ink tabular-nums">{usageSum.totalQty.toFixed(2)}</p>
+              </div>
+              <div className="rounded-xl border border-farm-accent-soft bg-farm-bg p-3">
+                <p className="text-[10px] font-bold uppercase text-farm-muted">Consumed value (FIFO cost)</p>
+                <p className="mt-1 text-2xl font-black text-farm-ink tabular-nums">{formatPeso(usageSum.totalCost)}</p>
+              </div>
+              <div className="rounded-xl border border-farm-accent-soft bg-farm-bg p-3">
+                <p className="text-[10px] font-bold uppercase text-farm-muted">Log events</p>
+                <p className="mt-1 text-2xl font-black text-farm-ink tabular-nums">{usageSum.count}</p>
+              </div>
+            </div>
+          </Card>
+
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <Card>
+              <h4 className="mb-3 text-sm font-bold text-farm-ink">By Category</h4>
+              {usageSum.byCategory.length === 0 ? (
+                <EmptyState title="No usage in this period" hint="Log usage from the Consumables tab — every entry appears here automatically." />
+              ) : (
+                <div className="space-y-2">
+                  {usageSum.byCategory.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-3 rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-2 text-sm">
+                      <div className="flex-1">
+                        <p className="font-semibold text-farm-ink">{row.label}</p>
+                        <p className="text-[10px] text-farm-muted">{row.count} log event{row.count === 1 ? '' : 's'} · {row.pct.toFixed(1)}% of total</p>
+                      </div>
+                      <p className="text-right text-sm font-bold text-farm-green tabular-nums">{row.qty.toFixed(2)} <span className="text-[10px] font-normal text-farm-muted">units</span></p>
+                      <p className="w-24 text-right text-xs font-bold text-farm-ink tabular-nums">{formatPeso(row.cost)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card>
+              <h4 className="mb-3 text-sm font-bold text-farm-ink">Top Items by Usage</h4>
+              {usageSum.byItem.length === 0 ? (
+                <EmptyState title="No usage yet" hint='Use the "Log Stock Usage" button on the Consumables tab to record what was used.' />
+              ) : (
+                <div className="space-y-2">
+                  {usageSum.byItem.map((row) => (
+                    <div key={row.key} className="flex items-center justify-between gap-3 rounded-lg border border-farm-accent-soft bg-farm-bg px-3 py-2 text-sm">
+                      <div className="flex-1">
+                        <p className="font-semibold text-farm-ink">{row.label}</p>
+                        <p className="text-[10px] text-farm-muted">{row.count} log event{row.count === 1 ? '' : 's'} · {row.pct.toFixed(1)}%</p>
+                      </div>
+                      <p className="text-right text-sm font-bold text-farm-green tabular-nums">{row.qty.toFixed(2)} <span className="text-[10px] font-normal text-farm-muted">units</span></p>
+                      <p className="w-24 text-right text-xs font-bold text-farm-ink tabular-nums">{formatPeso(row.cost)}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </div>
+
+          <Card>
+            <h4 className="mb-3 text-sm font-bold text-farm-ink">Recent Activity</h4>
+            {usageSum.recent.length === 0 ? (
+              <EmptyState title="No activity yet" hint='Recent "Log Stock Usage" entries will show here with the purpose they were used for.' />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-farm-accent-soft text-left text-xs uppercase text-farm-muted">
+                      <th className="px-2 py-2">Date</th>
+                      <th className="px-2 py-2">Item</th>
+                      <th className="px-2 py-2">Category</th>
+                      <th className="px-2 py-2 text-right">Qty</th>
+                      <th className="px-2 py-2 text-right">Cost (FIFO)</th>
+                      <th className="px-2 py-2">Purpose</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {usageSum.recent.map((r, i) => (
+                      <tr key={i} className="border-b border-farm-accent-soft/50 last:border-0">
+                        <td className="px-2 py-2 text-xs font-mono text-farm-muted">{r.date.slice(0, 16).replace('T', ' ')}</td>
+                        <td className="px-2 py-2 font-semibold text-farm-ink">{r.item}</td>
+                        <td className="px-2 py-2 text-xs">{r.category}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{r.qty.toFixed(2)}</td>
+                        <td className="px-2 py-2 text-right tabular-nums">{formatPeso(r.cost)}</td>
+                        <td className="px-2 py-2 text-xs text-farm-muted">{r.reason || '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
         </div>
       ) : tab === 'equipment' ? (
         <div className="animate-fade-in space-y-6">
