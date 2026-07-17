@@ -34,6 +34,7 @@ const ProfileScreen = lazy(() => import('../../features/profile/ProfileScreen'))
 const CopilotPanel = lazy(() => import('../../features/copilot/CopilotPanel'));
 const OperationsLayout = lazy(() => import('../../features/operations/OperationsLayout'));
 const CustomersScreen = lazy(() => import('../../features/customers/CustomersScreen'));
+const VendorsScreen = lazy(() => import('../../features/vendors/VendorsScreen'));
 // Crops & Plans removed (owner 2026-07-15): the /operations/crops tab + its subtree + the
 // app/features/crops/ feature folder were deleted per explicit owner instruction. The offline
 // Dexie schema (crop_* tables) + types + mock seeders are deliberately retained — purging them
@@ -110,6 +111,7 @@ export const router = createBrowserRouter([
       {path: 'inventory', element: <InventoryScreen />},
       {path: 'accounting', element: <AccountingScreen />},
       {path: 'customers', element: <CustomersScreen />},
+      {path: 'vendors', element: <VendorsScreen />},
       {path: 'payroll', element: <PayrollScreen />},
       // Operations hub (owner 2026-07-04): Schedules + Crops + Projects under one entry with tabs.
       {

@@ -21,6 +21,7 @@ import {
   ShoppingCart,
   Sparkles,
   Sun,
+  Truck,
   UserCheck,
   UserCircle,
 } from 'lucide-react';
@@ -46,6 +47,7 @@ const CORE_MODULES = [
   {to: '/inventory', label: 'Stock Inventories', icon: Package, perms: ['inventory.purchase', 'inventory.adjust', 'equipment.manage']},
   {to: '/accounting', label: 'Automated Accounting', icon: Landmark, perms: ['accounting.read']},
   {to: '/customers', label: 'Customers & Credit', icon: Contact, perms: ['customer.read']},
+  {to: '/vendors', label: 'Vendors & AP', icon: Truck, perms: ['vendor.read']},
   {to: '/payroll', label: 'Salaries & Payroll', icon: Users2, perms: undefined},
   {to: '/operations', label: 'Operations', icon: ClipboardList, perms: undefined},
   {to: '/copilot', label: 'VeggieGenius', icon: Sparkles, perms: undefined}, // CAP-VG1: advisory copilot (read-only, C7 §11)

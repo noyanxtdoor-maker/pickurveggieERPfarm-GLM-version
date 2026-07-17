@@ -124,7 +124,9 @@ export type PermissionKey =
   | 'project.read'
   | 'project.manage'
   | 'customer.read'
-  | 'customer.manage';
+  | 'customer.manage'
+  | 'vendor.read'    // T3.1 (2026-07-16): view vendors + AP standing
+  | 'vendor.manage'; // T3.1 (2026-07-16): create/edit vendors, cost-schedule, AP postings
 
 // ── Customers & Credit (P2-M9A / backlog B1) ──
 export interface Customer {
